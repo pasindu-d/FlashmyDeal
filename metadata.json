@@ -1,0 +1,6 @@
+{
+  "name": "FlashmyDeal",
+  "description": "A sleek, dark-themed high-conversion classifieds marketplace with secure Firebase authentication and Google Drive persistence.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
