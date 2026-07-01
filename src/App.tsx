@@ -118,7 +118,12 @@ export default function App() {
         } catch (e: any) {
           console.error('Error fetching profile:', e);
           setUserProfile(null);
-          showToast(`Profile Sync Error: ${e.message || e}`);
+          // Only show error if it is not the expected 'User not found' for a new user
+          if (e.message && e.message.includes('User not found')) {
+            // New user, no profile yet, completely normal
+          } else {
+            showToast(`Profile Sync Error: ${e.message || e}`);
+          }
         }
       } else {
         setUserProfile(null);
@@ -226,7 +231,12 @@ export default function App() {
       showToast('Authentication successful!', 'success');
     } catch (e: any) {
       console.error(e);
-      showToast(`Auth sync failed: ${e.message || e}`);
+      if (e.message && e.message.includes('User not found')) {
+        // User has authenticated but hasn't created a profile yet - this is successful authentication!
+        showToast('Authentication successful!', 'success');
+      } else {
+        showToast(`Auth sync failed: ${e.message || e}`);
+      }
     }
   };
 
