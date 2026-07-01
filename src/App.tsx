@@ -118,9 +118,11 @@ export default function App() {
         } catch (e: any) {
           console.error('Error fetching profile:', e);
           setUserProfile(null);
-          // Only show error if it is not the expected 'User not found' for a new user
-          if (e.message && e.message.includes('User not found')) {
-            // New user, no profile yet, completely normal
+          // Only show error if it is not the expected 'User not found' or 'not found' or 404 for a new user
+          const errorMsg = String(e?.message || e || '').toLowerCase();
+          if (errorMsg.includes('user not found') || errorMsg.includes('not found') || errorMsg.includes('404')) {
+            // New user or unregistered profile, completely normal on initial auth
+            console.log('No registered profile found yet for this user. A profile will be created upon first ad posting.');
           } else {
             showToast(`Profile Sync Error: ${e.message || e}`);
           }

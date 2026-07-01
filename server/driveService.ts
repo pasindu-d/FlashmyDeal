@@ -2,6 +2,10 @@ import fs from 'fs';
 import path from 'path';
 import { JWT } from 'google-auth-library';
 import { ProductListing, UserProfile } from '../src/types';
+import dotenv from 'dotenv';
+
+// Load environmental variables
+dotenv.config();
 
 let ROOT_FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID || '1uogikRic7Gm7ZipK5GRGRyOvt9hSKiQM';
 let SA_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || 'my-listings-drive@flashmydeal-501107.iam.gserviceaccount.com';
@@ -53,6 +57,11 @@ function isValidGoogleCredentials(email: string | null | undefined, key: string 
   
   // Must be a PEM formatted private key block
   if (!trimmedKey.includes('-----BEGIN')) return false;
+  
+  // Must not be the default hardcoded placeholder key (which is not a real working key for client's folders)
+  if (trimmedKey.includes('MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKY')) {
+    return false;
+  }
   
   // Must not be the hardcoded mockup placeholder key (which is not a real working key)
   if (trimmedKey.includes('MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC9CBi')) {
@@ -293,6 +302,25 @@ async function readDriveFile(fileId: string): Promise<string> {
 export async function initStorage() {
   console.log('Initializing FlashmyDeal Storage Engine...');
   
+  // 1. Read fresh values from process.env dynamically at runtime (to capture keys loaded after import)
+  if (process.env.GOOGLE_DRIVE_FOLDER_ID) {
+    ROOT_FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID;
+  }
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL) {
+    SA_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  }
+  if (process.env.GOOGLE_PRIVATE_KEY) {
+    PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY;
+  }
+
+  // Automatically detect and fix swapped credentials with fresh environment values
+  if (SA_EMAIL && SA_EMAIL.trim().includes('-----BEGIN PRIVATE KEY-----') && PRIVATE_KEY && PRIVATE_KEY.trim().includes('@') && PRIVATE_KEY.trim().includes('.')) {
+    console.log('[Drive Initialization] Auto-detected swapped GOOGLE_SERVICE_ACCOUNT_EMAIL and GOOGLE_PRIVATE_KEY in environment variables. Swapping them back!');
+    const temp = SA_EMAIL;
+    SA_EMAIL = PRIVATE_KEY;
+    PRIVATE_KEY = temp;
+  }
+
   // Ensure local directories exist (fallback always ready)
   try {
     if (!fs.existsSync(LOCAL_DATA_DIR)) fs.mkdirSync(LOCAL_DATA_DIR, { recursive: true });
