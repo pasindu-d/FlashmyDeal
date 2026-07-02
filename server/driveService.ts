@@ -28,7 +28,8 @@ const LOCAL_REGISTRY_PATH = path.join(LOCAL_DATA_DIR, 'global_registry.json');
 
 // Memory cache to avoid excessive reads
 let memoryRegistry: ProductListing[] = [];
-let storageMode: 'google_drive' | 'local_fallback' = 'local_fallback';
+let storageMode: 'google_drive' | 'local_fallback' | 'google_drive_error' = 'local_fallback';
+let driveErrorDetails: string | null = null;
 let jwtClient: JWT | null = null;
 
 // Initialize folder caches for Drive IDs to prevent lookups
@@ -57,16 +58,6 @@ function isValidGoogleCredentials(email: string | null | undefined, key: string 
   
   // Must be a PEM formatted private key block
   if (!trimmedKey.includes('-----BEGIN')) return false;
-  
-  // Must not be the default hardcoded placeholder key (which is not a real working key for client's folders)
-  if (trimmedKey.includes('MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKY')) {
-    return false;
-  }
-  
-  // Must not be the hardcoded mockup placeholder key (which is not a real working key)
-  if (trimmedKey.includes('MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC9CBi')) {
-    return false;
-  }
   
   return true;
 }
@@ -387,9 +378,10 @@ export async function initStorage() {
     memoryRegistry = parsed.listings || [];
     storageMode = 'google_drive';
     console.log(`FlashmyDeal is successfully running on Google Drive database with ${memoryRegistry.length} active listings.`);
-  } catch (err) {
-    console.error('Failed to initialize Google Drive storage. Switching to Local Fallback mode.', err);
-    storageMode = 'local_fallback';
+  } catch (err: any) {
+    console.error('Failed to initialize Google Drive storage. Catching error to display visual instructions in front-end.', err);
+    storageMode = 'google_drive_error';
+    driveErrorDetails = err.message || String(err);
   }
 }
 
@@ -403,6 +395,7 @@ export function getStorageStatus() {
     connected: storageMode === 'google_drive',
     itemCount: memoryRegistry.length,
     serviceAccountEmail: SA_EMAIL || null,
+    error: driveErrorDetails || null,
   };
 }
 
@@ -506,6 +499,10 @@ export async function getUser(userId: string): Promise<UserProfile | null> {
  * Save User Profile
  */
 export async function saveUser(userId: string, profile: UserProfile): Promise<void> {
+  if (storageMode === 'google_drive_error') {
+    throw new Error(`Google Drive Storage is currently in an error state: ${driveErrorDetails}. Write operations are disabled until this is resolved.`);
+  }
+
   const safeId = userId.replace(/[^a-zA-Z0-9_\-]/g, '');
 
   // Local write
@@ -541,6 +538,10 @@ export async function saveListing(
   listing: ProductListing,
   uploadedImages: { originalname: string; buffer: Buffer; mimetype: string }[]
 ): Promise<ProductListing> {
+  if (storageMode === 'google_drive_error') {
+    throw new Error(`Google Drive Storage is currently in an error state: ${driveErrorDetails}. Write operations are disabled until this is resolved.`);
+  }
+
   const listingId = listing.id;
   const safeListingId = listingId.replace(/[^a-zA-Z0-9_\-]/g, '');
   
@@ -668,6 +669,10 @@ export async function saveListing(
  * Update Listing Status (e.g., mark as SOLD)
  */
 export async function updateListingStatus(listingId: string, status: 'active' | 'sold' | 'inactive'): Promise<void> {
+  if (storageMode === 'google_drive_error') {
+    throw new Error(`Google Drive Storage is currently in an error state: ${driveErrorDetails}. Write operations are disabled until this is resolved.`);
+  }
+
   const safeId = listingId.replace(/[^a-zA-Z0-9_\-]/g, '');
 
   // Find in registry
@@ -747,6 +752,10 @@ async function deleteDriveItem(itemId: string): Promise<void> {
  * Delete a Product Listing from the registry, local files, and Google Drive
  */
 export async function deleteListing(listingId: string): Promise<void> {
+  if (storageMode === 'google_drive_error') {
+    throw new Error(`Google Drive Storage is currently in an error state: ${driveErrorDetails}. Write operations are disabled until this is resolved.`);
+  }
+
   const safeId = listingId.replace(/[^a-zA-Z0-9_\-]/g, '');
 
   // 1. Remove from global registry

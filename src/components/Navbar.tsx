@@ -12,6 +12,8 @@ interface NavbarProps {
     connected: boolean;
     rootFolderId: string;
     itemCount: number;
+    error?: string | null;
+    serviceAccountEmail?: string | null;
   } | null;
 }
 
@@ -55,26 +57,46 @@ export default function Navbar({ user, onOpenAuth, onOpenPostAd, storageStatus }
               <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border ${
                 storageStatus?.connected 
                   ? 'bg-emerald-950/30 border-emerald-500/30 text-emerald-400' 
-                  : 'bg-amber-950/30 border-amber-500/30 text-amber-400'
+                  : storageStatus?.mode === 'google_drive_error'
+                    ? 'bg-rose-950/30 border-rose-500/30 text-rose-400 animate-pulse'
+                    : 'bg-amber-950/30 border-amber-500/30 text-amber-400'
               }`}>
                 <Server className="w-3.5 h-3.5 animate-pulse" />
-                <span>{storageStatus?.connected ? 'Drive DB Live' : 'Local Fallback'}</span>
+                <span>
+                  {storageStatus?.connected 
+                    ? 'Drive DB Live' 
+                    : storageStatus?.mode === 'google_drive_error'
+                      ? 'Drive Quota Exceeded'
+                      : 'Local Fallback'}
+                </span>
               </div>
 
               {/* Status Tooltip */}
               {showStatusTooltip && (
-                <div className="absolute top-10 right-0 w-72 p-4 rounded-xl border border-gray-800 bg-obsidian-950/95 shadow-2xl backdrop-blur-md z-50 text-xs space-y-2 text-gray-300">
+                <div className="absolute top-10 right-0 w-80 p-4 rounded-xl border border-gray-800 bg-obsidian-950/95 shadow-2xl backdrop-blur-md z-50 text-xs space-y-2 text-gray-300">
                   <p className="font-bold text-white mb-1">Storage Engine Status</p>
                   <p>
-                    <strong className="text-vibrant-teal">Engine Mode:</strong> {storageStatus?.mode === 'google_drive' ? 'Google Drive REST API (v3)' : 'Local File JSON Database'}
+                    <strong className="text-vibrant-teal">Engine Mode:</strong> {
+                      storageStatus?.mode === 'google_drive' 
+                        ? 'Google Drive REST API (v3)' 
+                        : storageStatus?.mode === 'google_drive_error'
+                          ? 'Google Drive Connection Failure'
+                          : 'Local File JSON Database'
+                    }
                   </p>
                   <p>
                     <strong className="text-vibrant-teal">Registry Cache:</strong> {storageStatus?.itemCount || 0} active ads
                   </p>
                   {storageStatus?.mode === 'google_drive' ? (
                     <p className="text-emerald-400">
-                      ✔ Persisting files into the Google Drive directory: <code>1QGupOc3csc9W6rio0YKBpcFqCGxIm5Q8</code>
+                      ✔ Persisting files into the Google Drive directory: <code>{storageStatus.rootFolderId}</code>
                     </p>
+                  ) : storageStatus?.mode === 'google_drive_error' ? (
+                    <div className="text-rose-400 text-[11px] leading-relaxed space-y-1">
+                      <p className="font-bold">❌ Service Account Quota Restriction:</p>
+                      <p>Your Service Account has 0 bytes storage quota on personal Google Drive folders.</p>
+                      <p className="text-gray-400 mt-1">Please move the database folder into a Google Drive <strong>Shared Drive</strong> and share it with your Service Account as an Editor.</p>
+                    </div>
                   ) : (
                     <p className="text-amber-400 text-[11px] leading-relaxed">
                       ⚠ Running on high-fidelity offline JSON server backup. If you want to sync with Google Drive, configure your Google Service Account email and private keys in the secret keys panel.
