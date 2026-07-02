@@ -1,0 +1,53 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile representation",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "joinedDate": { "type": "string" },
+        "verifiedStatus": { "type": "boolean" },
+        "phone": { "type": "string" },
+        "listingRefs": { "type": "array" }
+      },
+      "required": ["uid", "email", "displayName"]
+    },
+    "ProductListing": {
+      "title": "ProductListing",
+      "description": "Product listing representation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "price": { "type": "number" },
+        "originalPrice": { "type": "number" },
+        "currency": { "type": "string" },
+        "category": { "type": "string" },
+        "condition": { "type": "string" },
+        "location": { "type": "string" },
+        "description": { "type": "string" },
+        "tags": { "type": "array" },
+        "timestamp": { "type": "number" },
+        "sellerId": { "type": "string" },
+        "sellerName": { "type": "string" },
+        "status": { "type": "string" },
+        "images": { "type": "array" },
+        "phone": { "type": "string" }
+      },
+      "required": ["id", "title", "price", "category", "location", "sellerId", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "UserProfile",
+      "description": "User profiles collection"
+    },
+    "/listings/{id}": {
+      "schema": "ProductListing",
+      "description": "Product listings collection"
+    }
+  }
+}

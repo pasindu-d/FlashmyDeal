@@ -332,47 +332,6 @@ export default function App() {
         storageStatus={storageStatus}
       />
 
-      {/* Google Drive Setup Warning Banner */}
-      {storageStatus?.mode === 'google_drive_error' && (
-        <div className="bg-red-950/20 border-b border-red-500/30 py-6 px-4">
-          <div className="mx-auto max-w-4xl rounded-2xl bg-obsidian-950/90 p-6 border border-red-500/20 shadow-2xl space-y-4">
-            <div className="flex items-start gap-4">
-              <div className="p-2.5 rounded-xl bg-red-950/80 text-rose-400 border border-red-500/20">
-                <AlertCircle className="w-6 h-6 stroke-[2]" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-base font-bold text-white tracking-tight">
-                  Google Drive Connection Limit (Service Account Storage Quota)
-                </h3>
-                <p className="text-sm text-gray-400 mt-1 leading-relaxed">
-                  Your Google Service Account email <code className="text-vibrant-teal">{storageStatus.serviceAccountEmail}</code> is connected to folder ID <code className="text-vibrant-teal">{storageStatus.rootFolderId}</code>. However, Google personal drives (e.g. standard @gmail.com folders) enforce a <strong>0 byte storage quota</strong> for Service Accounts, which causes file uploads to fail with error: <code className="text-rose-400 font-mono text-xs">{storageStatus.error}</code>.
-                </p>
-              </div>
-            </div>
-
-            <div className="pl-14 space-y-3 border-t border-gray-800/60 pt-4">
-              <p className="text-xs font-semibold text-vibrant-teal uppercase tracking-wider">
-                How to resolve this in 3 quick steps:
-              </p>
-              <ol className="text-xs text-gray-300 space-y-2.5 list-decimal list-inside leading-relaxed">
-                <li>
-                  In your Google Drive, create or use a <strong className="text-white">Shared Drive</strong> (requires a Google Workspace business/enterprise tier, or being invited to one).
-                </li>
-                <li>
-                  Create a folder inside that Shared Drive and <strong className="text-white">Share</strong> the Shared Drive or folder with your Service Account email (<code className="text-vibrant-teal break-all">{storageStatus.serviceAccountEmail}</code>) as an <strong className="text-emerald-400">Editor</strong> or <strong className="text-emerald-400">Content Manager</strong>.
-                </li>
-                <li>
-                  Update your <code className="text-white">GOOGLE_DRIVE_FOLDER_ID</code> environment variable in your settings to use the ID of that new folder inside your Shared Drive.
-                </li>
-              </ol>
-              <div className="text-xs text-amber-400/80 mt-2 bg-amber-950/20 border border-amber-500/10 rounded-xl p-3 leading-relaxed">
-                <strong>Read-Only Mode Active:</strong> To protect database consistency, creating, updating, or deleting listings is temporarily disabled until the Drive storage configuration is finalized.
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Hero Header with Search Panel */}
       <Hero 
         searchQuery={searchQuery}
