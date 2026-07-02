@@ -13,6 +13,7 @@ import {
   getDocFromServer
 } from 'firebase/firestore';
 import { ProductListing, UserProfile } from '../src/types';
+import firebaseAppletConfig from '../firebase-applet-config.json';
 
 // Storage directories for local backup / images
 const isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_VERSION || process.env.NETLIFY);
@@ -40,19 +41,97 @@ export async function initStorage() {
   }
 
   try {
-    const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
-    if (fs.existsSync(configPath)) {
-      const configContent = fs.readFileSync(configPath, 'utf8');
-      const firebaseConfig = JSON.parse(configContent);
-      
+    let firebaseConfig: any = null;
+
+    // 1. Try Environment Variables
+    if (process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY) {
+      console.log('Firebase credentials detected in environment variables.');
+      firebaseConfig = {
+        apiKey: process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY,
+        authDomain: process.env.FIREBASE_AUTH_DOMAIN || process.env.VITE_FIREBASE_AUTH_DOMAIN,
+        projectId: process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID,
+        storageBucket: process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET,
+        messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+        appId: process.env.FIREBASE_APP_ID || process.env.VITE_FIREBASE_APP_ID,
+        measurementId: process.env.FIREBASE_MEASUREMENT_ID || process.env.VITE_FIREBASE_MEASUREMENT_ID || "",
+        firestoreDatabaseId: process.env.FIREBASE_FIRESTORE_DATABASE_ID || process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || "ai-studio-flashmydeal-39b0a400-2e3e-40fe-9014-754e57123583"
+      };
+    } else if (process.env.FIREBASE_CONFIG) {
+      console.log('FIREBASE_CONFIG JSON detected in environment variables.');
+      try {
+        firebaseConfig = JSON.parse(process.env.FIREBASE_CONFIG);
+      } catch (parseErr) {
+        console.error('Failed to parse FIREBASE_CONFIG env variable:', parseErr);
+      }
+    }
+
+    // 2. Try file-system check (local development)
+    if (!firebaseConfig) {
+      const pathsToTry = [
+        path.join(process.cwd(), 'firebase-applet-config.json'),
+        path.join(process.cwd(), '..', 'firebase-applet-config.json'),
+        path.join(__dirname, 'firebase-applet-config.json'),
+        path.join(__dirname, '..', 'firebase-applet-config.json'),
+        path.join(__dirname, '..', '..', 'firebase-applet-config.json')
+      ];
+
+      for (const configPath of pathsToTry) {
+        if (fs.existsSync(configPath)) {
+          console.log(`Found firebase-applet-config.json at: ${configPath}`);
+          try {
+            const configContent = fs.readFileSync(configPath, 'utf8');
+            firebaseConfig = JSON.parse(configContent);
+            break;
+          } catch (readErr) {
+            console.error(`Failed to read/parse config from ${configPath}:`, readErr);
+          }
+        }
+      }
+    }
+
+    // 3. Static bundle-time import fallback (embedded directly inside the bundle output)
+    if (!firebaseConfig) {
+      try {
+        console.log('Attempting to use statically bundled firebase credentials fallback...');
+        firebaseConfig = firebaseAppletConfig;
+      } catch (staticErr) {
+        console.warn('Statically bundled config not available or failed:', staticErr);
+      }
+    }
+
+    // 4. Override or fallback to user's "flashmydeal" Firebase config when running on Vercel (or if config is empty)
+    const isVercel = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_VERSION || process.env.NETLIFY);
+    const hasCustomEnv = !!(process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_CONFIG);
+    
+    if ((isVercel && !hasCustomEnv) || !firebaseConfig) {
+      console.log('Vercel environment or empty config detected. Defaulting to production "flashmydeal" Firebase configuration.');
+      firebaseConfig = {
+        apiKey: "AIzaSyDQpQA5eiW8aHgl6P-s1JNnhQRaX_tpnD0",
+        authDomain: "flashmydeal.firebaseapp.com",
+        projectId: "flashmydeal",
+        storageBucket: "flashmydeal.firebasestorage.app",
+        messagingSenderId: "239151602196",
+        appId: "1:239151602196:web:83804b1242027c5a566501",
+        measurementId: "G-JDP6ZGWGNL",
+        firestoreDatabaseId: "(default)"
+      };
+    }
+
+    if (firebaseConfig && firebaseConfig.projectId) {
       console.log('Initializing Firebase App with Project ID:', firebaseConfig.projectId);
       const app = initializeApp(firebaseConfig);
       
       // Initialize Firestore with custom databaseId if specified
-      const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
+      let dbId = '(default)';
+      if (firebaseConfig.firestoreDatabaseId) {
+        dbId = firebaseConfig.firestoreDatabaseId;
+      } else if (firebaseConfig.projectId === 'soulmatch-d86d7') {
+        dbId = 'ai-studio-flashmydeal-39b0a400-2e3e-40fe-9014-754e57123583';
+      }
+
       db = getFirestore(app, dbId);
       storageMode = 'firebase';
-      console.log('Firebase Firestore successfully initialized.');
+      console.log(`Firebase Firestore successfully initialized using database: ${dbId}`);
 
       // Validate connection to Firestore
       try {
@@ -65,7 +144,7 @@ export async function initStorage() {
       // Hydrate registry memory cache from Firestore
       await refreshRegistry();
     } else {
-      console.warn('firebase-applet-config.json not found. Falling back to memory storage.');
+      console.warn('No Firebase configuration could be resolved. Falling back to local/memory storage.');
       storageMode = 'local_fallback';
     }
   } catch (err: any) {
