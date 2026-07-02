@@ -46,6 +46,51 @@ export default function Navbar({ user, onOpenAuth, onOpenPostAd, storageStatus }
             </div>
           </div>
 
+          {/* Database & Connection Indicator */}
+          <div className="hidden md:flex items-center gap-4">
+            <div 
+              className="relative cursor-pointer"
+              onMouseEnter={() => setShowStatusTooltip(true)}
+              onMouseLeave={() => setShowStatusTooltip(false)}
+              onClick={() => setShowStatusTooltip(!showStatusTooltip)}
+            >
+              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border ${
+                storageStatus?.mode === 'firebase'
+                  ? 'bg-emerald-950/30 border-emerald-500/30 text-emerald-400'
+                  : 'bg-amber-950/30 border-amber-500/30 text-amber-400'
+              }`}>
+                <Server className="w-3.5 h-3.5 animate-pulse" />
+                <span>
+                  {storageStatus?.mode === 'firebase' ? 'Firebase Live' : 'Local Database'}
+                </span>
+              </div>
+
+              {/* Status Tooltip */}
+              {showStatusTooltip && (
+                <div className="absolute top-10 right-0 w-80 p-4 rounded-xl border border-gray-800 bg-obsidian-950/95 shadow-2xl backdrop-blur-md z-50 text-xs space-y-2 text-gray-300">
+                  <p className="font-bold text-white mb-1">Storage Engine Status</p>
+                  <p>
+                    <strong className="text-vibrant-teal">Engine Mode:</strong> {
+                      storageStatus?.mode === 'firebase' 
+                        ? 'Google Firebase Firestore (Cloud)' 
+                        : 'Local File JSON Database'
+                    }
+                  </p>
+                  <p>
+                    <strong className="text-vibrant-teal">Registry Cache:</strong> {storageStatus?.itemCount || 0} active ads
+                  </p>
+                  <p className="text-emerald-400 text-[11px] leading-relaxed">
+                    {storageStatus?.mode === 'firebase' ? (
+                      '✔ FlashmyDeal is successfully running on Google Firebase Firestore database. All listings, uploads, and profiles are safely synced with the cloud.'
+                    ) : (
+                      '✔ FlashmyDeal is running on local offline JSON database storage backup.'
+                    )}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Action Area */}
           <div className="flex items-center gap-3">
             {/* User Profile Info */}
