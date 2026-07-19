@@ -39,6 +39,25 @@ This guide and script has been pre-configured with **your custom Google Drive pa
 
 ---
 
+## 🛠️ Troubleshooting: "You do not have permission to call MailApp.sendEmail" Error
+If you see an error about **"You do not have permission to call MailApp.sendEmail"** or **"https://www.googleapis.com/auth/script.send_mail"**, this happens because the Google account has not yet granted authorization for the email sending and Drive file management functions. Since `initSheets` only references Google Sheets, running it does not trigger the necessary email or Drive permissions.
+
+Follow these **simple steps** to force-authorize all required permissions in one go:
+
+1. **Open your Apps Script Editor** (Extensions > Apps Script).
+2. Scroll to the very bottom of the code. (Ensure you have copied the updated script below which includes the new `authorizeScript` function).
+3. In the toolbar at the top of the Apps Script Editor, click the function dropdown (next to the **Run** button) and select **`authorizeScript`**.
+4. Click the **Run** button.
+5. A popup will appear saying **"Authorization Required"**.
+6. Click **Review permissions**, select your Google account.
+7. Click **Advanced** at the bottom-left of the prompt, select **Go to Untitled project (unsafe)**, and click **Allow**.
+8. Once execution finishes, check your email inbox! You will receive a test email confirming all permissions (Spreadsheet, Drive, and Mail) are successfully authorized.
+9. **CRITICAL STEP**: Now, click **Deploy** (top-right) > **Manage deployments** > click the **Edit (pencil icon)** next to your active deployment > change Web App Version to **"New version"** > click **Deploy**. This ensures the live API Web App URL is refreshed with your newly authorized permissions.
+
+Once you grant this permission and redeploy, all user registrations, OTP emails, contact form messages, and image uploads will work beautifully!
+
+---
+
 ## 📝 Code.gs (Copy & Paste this)
 
 ```javascript
@@ -591,5 +610,21 @@ function deleteListingRow(sheet, listingId) {
     }
   }
   return false;
+}
+
+// Run this function once in the Google Apps Script editor to authorize all permissions!
+function authorizeScript() {
+  // Trigger Spreadsheet App permission
+  var doc = SpreadsheetApp.getActiveSpreadsheet();
+  Logger.log("Authorized SpreadsheetApp. Active Sheet URL: " + doc.getUrl());
+  
+  // Trigger Drive App permission
+  var folders = DriveApp.getFolders();
+  Logger.log("Authorized DriveApp. Folders found: " + folders.hasNext());
+  
+  // Trigger Mail App & Gmail App permission
+  var email = Session.getActiveUser().getEmail();
+  MailApp.sendEmail(email, "FlashmyDeal Authorization Successful", "You have successfully authorized your Google Apps Script permissions for FlashmyDeal!");
+  Logger.log("Authorized MailApp & GmailApp. Sent test email to: " + email);
 }
 ```

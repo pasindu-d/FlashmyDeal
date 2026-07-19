@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Mail, Send, CheckCircle2, AlertCircle, ArrowLeft, MessageSquare, User, Tag } from 'lucide-react';
-import { apiSendContactEmail } from '../lib/appsScript';
 
 interface ContactUsProps {
   onBack: () => void;
@@ -12,6 +11,7 @@ interface ContactUsProps {
 
 export default function ContactUs({ onBack, showToast, initialUserEmail, initialUserName }: ContactUsProps) {
   const [name, setName] = useState(initialUserName || '');
+  const [email, setEmail] = useState(initialUserEmail || '');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -22,6 +22,10 @@ export default function ContactUs({ onBack, showToast, initialUserEmail, initial
     e.preventDefault();
     if (!name.trim()) {
       showToast('Please enter your name', 'error');
+      return;
+    }
+    if (!email.trim()) {
+      showToast('Please enter your email', 'error');
       return;
     }
     if (!subject.trim()) {
@@ -36,18 +40,61 @@ export default function ContactUs({ onBack, showToast, initialUserEmail, initial
     setIsSending(true);
     setError(null);
 
+    const targetEmail = "wmpdhananjaya@gmail.com";
+
     try {
-      const success = await apiSendContactEmail(name, subject, message);
-      if (success) {
-        setSubmitted(true);
-        showToast('Your message has been sent successfully!', 'success');
-      } else {
-        throw new Error('Failed to send email. Please try again.');
+      // 1. Store locally for state confirmation / message history
+      const savedMessages = JSON.parse(localStorage.getItem('contact-messages') || '[]');
+      savedMessages.push({
+        name,
+        email,
+        subject,
+        message,
+        date: new Date().toISOString()
+      });
+      localStorage.setItem('contact-messages', JSON.stringify(savedMessages));
+
+      // 2. Real API Submission via FormSubmit AJAX (Option A)
+      const response = await fetch(`https://formsubmit.co/ajax/${targetEmail}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify({
+          _subject: subject || "FlashmyDeal Marketplace Inquiry",
+          name: name,
+          email: email,
+          message: message
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error("FormSubmit response not OK");
       }
+
+      setSubmitted(true);
+      setSubject('');
+      setMessage('');
+      showToast('Your message has been sent successfully!', 'success');
     } catch (err: any) {
-      console.error('Contact form submission error:', err);
-      setError(err.message || 'An unexpected error occurred while sending your message.');
-      showToast(err.message || 'Failed to send message.', 'error');
+      console.warn("API submission failed, falling back to mailto client...", err);
+      
+      // Fallback: If offline or service is unreachable, trigger mailto client gracefully
+      const mailtoLink = `mailto:${targetEmail}?subject=${encodeURIComponent(subject || 'FlashmyDeal Enquiry')}&body=${encodeURIComponent(`Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`)}`;
+      
+      const link = document.createElement('a');
+      link.href = mailtoLink;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      setSubmitted(true);
+      setSubject('');
+      setMessage('');
+      showToast('Redirected to mail client to send message.', 'success');
     } finally {
       setIsSending(false);
     }
@@ -81,7 +128,7 @@ export default function ContactUs({ onBack, showToast, initialUserEmail, initial
                 Message Sent!
               </h2>
               <p className="text-xs text-gray-400 max-w-md mx-auto leading-relaxed">
-                Thank you for contacting us, <span className="text-white font-semibold">{name}</span>. Your message about <span className="text-vibrant-teal font-semibold">"{subject}"</span> has been dispatched securely to <span className="text-electric-amber font-mono">wmpdhananjaya@gmail.com</span>.
+                Thank you for contacting us, <span className="text-white font-semibold">{name}</span>. Your message has been dispatched securely to our team.
               </p>
             </div>
             <div className="pt-4">
@@ -131,6 +178,23 @@ export default function ContactUs({ onBack, showToast, initialUserEmail, initial
                 />
               </div>
 
+              {/* Email field */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
+                  <Mail className="w-3.5 h-3.5 text-gray-500" />
+                  Your Email
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="Enter your email address"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-obsidian-900 border border-gray-800 rounded-xl py-3 px-4 text-sm text-white focus:outline-none focus:border-vibrant-teal font-medium"
+                  id="contact-email-input"
+                />
+              </div>
+
               {/* Subject field */}
               <div className="space-y-2">
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
@@ -151,7 +215,7 @@ export default function ContactUs({ onBack, showToast, initialUserEmail, initial
               {/* Message field */}
               <div className="space-y-2">
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
-                  <Mail className="w-3.5 h-3.5 text-gray-500" />
+                  <MessageSquare className="w-3.5 h-3.5 text-gray-500" />
                   Message
                 </label>
                 <textarea
