@@ -311,6 +311,8 @@ export default function App() {
 
   // Filter listings based on criteria
   const filteredListings = listings.filter((item) => {
+    if (!item) return false;
+
     // Only saved favorites filter
     if (onlyFavoritesFilter && !favorites.includes(item.id)) return false;
 
@@ -340,14 +342,14 @@ export default function App() {
     if (conditionFilter && item.condition !== conditionFilter) return false;
 
     // Min price
-    if (minPrice && item.price < Number(minPrice)) return false;
+    if (minPrice && (Number(item.price) || 0) < Number(minPrice)) return false;
 
     // Max price
-    if (maxPrice && item.price > Number(maxPrice)) return false;
+    if (maxPrice && (Number(item.price) || 0) > Number(maxPrice)) return false;
 
     // Only hot flash deals (items with an original price higher than standard price)
     if (onlyDealsFilter) {
-      const isDeal = item.originalPrice && item.originalPrice > item.price;
+      const isDeal = item.originalPrice && Number(item.originalPrice) > Number(item.price);
       if (!isDeal) return false;
     }
 
@@ -356,7 +358,7 @@ export default function App() {
 
   // Calculate separate list for "Hot Flash Deals" (recently dropped in price)
   const hotFlashDeals = listings
-    .filter(item => item.originalPrice && item.originalPrice > item.price && item.status === 'active')
+    .filter(item => item && item.originalPrice && Number(item.originalPrice) > Number(item.price) && item.status === 'active')
     .slice(0, 4);
 
   return (
@@ -671,17 +673,17 @@ export default function App() {
                           {listing.title}
                         </h4>
                         <p className="text-xs text-gray-500 line-clamp-1">{listing.description}</p>
-                        <p className="text-xs text-gray-400 font-medium">📍 {listing.location} • Posted {new Date(listing.timestamp).toLocaleDateString()}</p>
+                        <p className="text-xs text-gray-400 font-medium">📍 {listing.location} • Posted {new Date(Number(listing.timestamp) || Date.now()).toLocaleDateString()}</p>
                       </div>
                       <div className="text-right shrink-0 mt-3 sm:mt-0 flex flex-col items-end gap-2">
                         <div>
                           {listing.originalPrice && (
                             <span className="text-xs text-gray-500 line-through font-mono block">
-                              LKR {listing.originalPrice.toLocaleString()}
+                              LKR {(Number(listing.originalPrice) || 0).toLocaleString()}
                             </span>
                           )}
                           <span className="text-base font-black text-electric-amber font-mono">
-                            LKR {listing.price.toLocaleString()}
+                            LKR {(Number(listing.price) || 0).toLocaleString()}
                           </span>
                         </div>
                         <button

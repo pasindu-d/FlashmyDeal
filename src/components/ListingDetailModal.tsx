@@ -36,9 +36,14 @@ export default function ListingDetailModal({
   const isOwner = currentUserId && currentUserId === listing.sellerId;
   const isSold = listing.status === 'sold';
 
+  const price = Number(listing.price) || 0;
+  const originalPrice = listing.originalPrice ? Number(listing.originalPrice) : undefined;
+
   // Calculate savings
-  const savings = listing.originalPrice ? listing.originalPrice - listing.price : 0;
-  const savingsPct = listing.originalPrice ? Math.round((savings / listing.originalPrice) * 100) : 0;
+  const savings = originalPrice ? originalPrice - price : 0;
+  const savingsPct = originalPrice ? Math.round((savings / originalPrice) * 100) : 0;
+
+  const timestamp = Number(listing.timestamp) || Date.now();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
@@ -159,7 +164,7 @@ export default function ListingDetailModal({
                     <MapPin className="w-4 h-4 text-gray-500" /> {listing.location}
                   </span>
                   <span className="flex items-center gap-1">
-                    <Calendar className="w-4 h-4 text-gray-500" /> Posted {new Date(listing.timestamp).toLocaleDateString()}
+                    <Calendar className="w-4 h-4 text-gray-500" /> Posted {new Date(timestamp).toLocaleDateString()}
                   </span>
                 </div>
 
@@ -168,15 +173,15 @@ export default function ListingDetailModal({
                   <span className="text-xs text-gray-500 uppercase font-mono block mb-1">Price</span>
                   <div className="flex items-baseline gap-3">
                     <span className="text-3xl font-black text-electric-amber font-mono tracking-tight">
-                      LKR {listing.price.toLocaleString()}
+                      LKR {price.toLocaleString()}
                     </span>
-                    {listing.originalPrice && listing.originalPrice > listing.price && (
+                    {originalPrice && originalPrice > price && (
                       <span className="text-sm text-gray-500 line-through font-mono">
-                        LKR {listing.originalPrice.toLocaleString()}
+                        LKR {originalPrice.toLocaleString()}
                       </span>
                     )}
                   </div>
-                  {listing.originalPrice && listing.originalPrice > listing.price && (
+                  {originalPrice && originalPrice > price && (
                     <div className="mt-2 text-xs font-bold text-emerald-400 bg-emerald-950/20 border border-emerald-500/20 px-2 py-1 rounded-lg inline-flex items-center gap-1.5">
                       <ShieldCheck className="w-3.5 h-3.5" />
                       Save LKR {savings.toLocaleString()} ({savingsPct}% Flash drop!)

@@ -109,17 +109,97 @@ export function isUsingAppsScript(): boolean {
 }
 
 // Local listings persistence helper
+export function sanitizeListings(rawListings: any[]): ProductListing[] {
+  if (!Array.isArray(rawListings)) return [];
+  return rawListings
+    .filter((item: any) => item && typeof item === 'object')
+    .map((item: any) => {
+      const cleanItem: any = { ...item };
+      
+      if (!cleanItem.id) {
+        cleanItem.id = 'listing_' + Math.random().toString(36).substring(2, 11);
+      }
+      
+      const parsedPrice = parseFloat(cleanItem.price);
+      cleanItem.price = isNaN(parsedPrice) ? 0 : parsedPrice;
+      
+      if (cleanItem.originalPrice !== undefined && cleanItem.originalPrice !== null && cleanItem.originalPrice !== '') {
+        const parsedOrig = parseFloat(cleanItem.originalPrice);
+        cleanItem.originalPrice = isNaN(parsedOrig) ? undefined : parsedOrig;
+      } else {
+        cleanItem.originalPrice = undefined;
+      }
+      
+      const parsedTime = Number(cleanItem.timestamp);
+      cleanItem.timestamp = isNaN(parsedTime) || !parsedTime ? Date.now() : parsedTime;
+      
+      let imgList: string[] = [];
+      if (cleanItem.images) {
+        if (Array.isArray(cleanItem.images)) {
+          imgList = cleanItem.images;
+        } else if (typeof cleanItem.images === 'string') {
+          try {
+            const parsedImages = JSON.parse(cleanItem.images);
+            if (Array.isArray(parsedImages)) {
+              imgList = parsedImages;
+            } else {
+              imgList = [cleanItem.images];
+            }
+          } catch {
+            imgList = cleanItem.images.split(',').map((u: string) => u.trim()).filter(Boolean);
+          }
+        }
+      }
+      cleanItem.images = imgList.map(cleanGoogleDriveUrl);
+      if (cleanItem.images.length === 0) {
+        cleanItem.images = ['https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=600&auto=format&fit=crop&q=60'];
+      }
+      
+      let tagList: string[] = [];
+      if (cleanItem.tags) {
+        if (Array.isArray(cleanItem.tags)) {
+          tagList = cleanItem.tags;
+        } else if (typeof cleanItem.tags === 'string') {
+          try {
+            const parsedTags = JSON.parse(cleanItem.tags);
+            if (Array.isArray(parsedTags)) {
+              tagList = parsedTags;
+            } else {
+              tagList = [cleanItem.tags];
+            }
+          } catch {
+            tagList = cleanItem.tags.split(/[,\s]+/).map((t: string) => t.trim()).filter(Boolean);
+          }
+        }
+      }
+      cleanItem.tags = tagList.map((t: any) => String(t).trim().toLowerCase()).filter(Boolean);
+      
+      cleanItem.title = cleanItem.title ? String(cleanItem.title).trim() : 'Untitled Deal';
+      cleanItem.category = cleanItem.category ? String(cleanItem.category).trim() : 'Other';
+      cleanItem.condition = cleanItem.condition ? String(cleanItem.condition).trim() : 'Good';
+      cleanItem.location = cleanItem.location ? String(cleanItem.location).trim() : 'Colombo';
+      cleanItem.description = cleanItem.description ? String(cleanItem.description).trim() : '';
+      cleanItem.status = cleanItem.status === 'sold' || cleanItem.status === 'inactive' ? cleanItem.status : 'active';
+      cleanItem.phone = cleanItem.phone ? String(cleanItem.phone).trim() : '';
+      
+      return cleanItem as ProductListing;
+    });
+}
+
 function getLocalListings(): ProductListing[] {
   const localData = localStorage.getItem(LOCAL_LISTINGS_KEY);
+  let list: any[] = [];
   if (!localData) {
     localStorage.setItem(LOCAL_LISTINGS_KEY, JSON.stringify(SEED_LISTINGS));
-    return SEED_LISTINGS;
+    list = SEED_LISTINGS;
+  } else {
+    try {
+      list = JSON.parse(localData);
+    } catch {
+      list = SEED_LISTINGS;
+    }
   }
-  try {
-    return JSON.parse(localData);
-  } catch {
-    return SEED_LISTINGS;
-  }
+  return sanitizeListings(list);
 }
 
 function saveLocalListings(listings: ProductListing[]): void {
@@ -194,27 +274,7 @@ export async function apiFetchListings(): Promise<ProductListing[]> {
     }
     
     const rawListings = Array.isArray(data) ? data : [];
-    // Clean and transform image URLs
-    const cleanedListings = rawListings.map((item: any) => {
-      if (item.images && Array.isArray(item.images)) {
-        item.images = item.images.map(cleanGoogleDriveUrl);
-      }
-      // Ensure tags is always an array of strings
-      if (item.tags) {
-        if (typeof item.tags === 'string') {
-          try {
-            item.tags = JSON.parse(item.tags);
-          } catch (e) {
-            item.tags = item.tags.split(/[,\s]+/).map((t: string) => t.trim()).filter(Boolean);
-          }
-        }
-      }
-      if (!Array.isArray(item.tags)) {
-        item.tags = [];
-      }
-      return item as ProductListing;
-    });
-    return cleanedListings;
+    return sanitizeListings(rawListings);
   } catch (err: any) {
     console.error('[AppsScript Client] Fetching from Apps Script failed, using local fallback:', err);
     // Keep local storage listings intact in case Google is down or URL has CORS issues

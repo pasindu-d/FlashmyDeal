@@ -15,13 +15,16 @@ export default function ListingCard({ listing, onClick, isFavorite = false, onTo
   const isSold = listing.status === 'sold';
   
   // Format price drop percentage
-  const priceDropAmount = listing.originalPrice ? listing.originalPrice - listing.price : 0;
-  const priceDropPct = listing.originalPrice 
-    ? Math.round((priceDropAmount / listing.originalPrice) * 100) 
+  const price = Number(listing.price) || 0;
+  const originalPrice = listing.originalPrice ? Number(listing.originalPrice) : undefined;
+  const priceDropAmount = originalPrice ? originalPrice - price : 0;
+  const priceDropPct = originalPrice 
+    ? Math.round((priceDropAmount / originalPrice) * 100) 
     : 0;
 
   // Format date relative or neat format
-  const formattedDate = new Date(listing.timestamp).toLocaleDateString('en-US', {
+  const timestamp = Number(listing.timestamp) || Date.now();
+  const formattedDate = new Date(timestamp).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
   });
@@ -45,7 +48,7 @@ export default function ListingCard({ listing, onClick, isFavorite = false, onTo
       <div className="relative aspect-video w-full overflow-hidden bg-obsidian-950">
         
         {/* Price Drop Badge (Top Left) */}
-        {listing.originalPrice && listing.originalPrice > listing.price && (
+        {originalPrice && originalPrice > price && (
           <div className="absolute top-3 left-3 z-10 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-electric-amber text-obsidian-950 shadow-[0_4px_10px_rgba(255,159,10,0.3)] animate-bounce">
             <TrendingDown className="w-3.5 h-3.5 stroke-[3]" />
             <span>-{priceDropPct}% Price Flash</span>
@@ -121,13 +124,13 @@ export default function ListingCard({ listing, onClick, isFavorite = false, onTo
         {/* Price Section */}
         <div className="flex items-end justify-between mt-auto">
           <div className="flex flex-col">
-            {listing.originalPrice && listing.originalPrice > listing.price && (
+            {originalPrice && originalPrice > price && (
               <span className="text-xs text-gray-500 line-through font-mono">
-                LKR {listing.originalPrice.toLocaleString()}
+                LKR {originalPrice.toLocaleString()}
               </span>
             )}
             <span className="text-lg font-black text-electric-amber font-mono tracking-tight">
-              LKR {listing.price.toLocaleString()}
+              LKR {price.toLocaleString()}
             </span>
           </div>
 
