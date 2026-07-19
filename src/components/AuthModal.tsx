@@ -60,7 +60,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
           // Sign them out immediately to prevent unauthorized state
           await signOut(auth);
           setMode('verify');
-          setError('Your email is not verified yet. We have sent a new secure verification link to your inbox. Please click the link in the email to verify and then try logging in again.');
+          setError('Please verify your email by clicking the link in the verification mail we just sent to you. If you don\'t see it, please check your Inbox or Spam folder. Thank you!');
           return;
         }
         
@@ -314,25 +314,19 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
               </div>
 
               <div className="space-y-3">
-                <h3 className="text-2xl font-bold text-white tracking-tight">Please Check Your Inbox</h3>
+                <h3 className="text-2xl font-bold text-white tracking-tight">Verify Your Email</h3>
                 <p className="text-sm text-gray-400 max-w-sm mx-auto leading-relaxed">
-                  We have sent a secure, one-click verification link to your email:<br />
+                  Please verify your email address by clicking the link in the mail sent to:<br />
                   <span className="text-vibrant-teal font-medium block mt-1.5 break-all select-all">{email}</span>
                 </p>
-                <p className="text-xs text-gray-500 max-w-sm mx-auto">
-                  Click the link in the email from Google Firebase to verify your account instantly.
+                <p className="text-xs text-gray-500 max-w-sm mx-auto leading-relaxed">
+                  If you do not see the email, please check your <strong>Inbox</strong> or <strong>Spam folder</strong>. Thank you!
                 </p>
               </div>
 
-              <div className="p-4 bg-obsidian-950/60 border border-gray-800 rounded-xl text-left text-xs text-gray-400 space-y-2.5">
-                <p className="font-semibold text-white flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-vibrant-teal" /> Zero Spam Delivery
-                </p>
-                <p className="leading-relaxed">
-                  Because the verification link is delivered directly from Google's high-reputation servers, it will reliably land straight in your <strong>Inbox</strong> rather than the spam folder.
-                </p>
-                <p className="text-[11px] leading-relaxed text-gray-500 border-t border-gray-900 pt-2">
-                  <strong>Need a new link?</strong> Simply try to log in with your email and password, and we will automatically send you a fresh verification email.
+              <div className="p-4 bg-obsidian-950/60 border border-gray-800 rounded-xl text-left text-xs text-gray-400">
+                <p className="text-[11px] leading-relaxed text-gray-500 text-center">
+                  <strong>Need a new link?</strong> Simply try to log in again with your email and password, and we will send a fresh verification mail.
                 </p>
               </div>
 

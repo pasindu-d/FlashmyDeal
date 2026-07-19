@@ -53,7 +53,7 @@ export default function Navbar({ user, userProfile, onOpenAuth, onOpenPostAd }: 
 
   const handleDeleteAccount = async () => {
     const confirmDelete = window.confirm(
-      "⚠️ WARNING: This will permanently delete your seller profile and credentials from the FlashmyDeal database and Firebase. This action is irreversible. Do you wish to continue?"
+      "WARNING: This will permanently delete your seller profile and credentials. This action is irreversible. Do you wish to continue?"
     );
     if (!confirmDelete) return;
 
