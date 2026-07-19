@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Zap, LogIn, LogOut, ShieldAlert, CheckCircle2, Sun, Moon, Trash2, ChevronDown, Gift } from 'lucide-react';
-import { auth, signOut } from '../lib/firebase';
+import { auth, signOut, db } from '../lib/firebase';
 import { User, deleteUser as deleteFirebaseAuthUser } from 'firebase/auth';
+import { doc, deleteDoc } from 'firebase/firestore';
 import { getAppsScriptUrl } from '../lib/appsScript';
 import { UserProfile } from '../types';
 
@@ -66,33 +67,68 @@ export default function Navbar({ user, userProfile, onOpenAuth, onOpenPostAd }: 
       
       // 1. Send delete request to Google Sheets
       if (appsScriptUrl) {
-        await fetch('/api/proxy', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            url: appsScriptUrl,
-            payload: {
-              action: 'deleteUser',
-              uid
-            }
-          })
-        });
+        try {
+          await fetch('/api/proxy', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              url: appsScriptUrl,
+              payload: {
+                action: 'deleteUser',
+                uid
+              }
+            })
+          });
+        } catch (sheetErr) {
+          console.error("Failed to delete user row in Google Sheets:", sheetErr);
+        }
       }
 
-      // 2. Delete from Firebase Authentication
-      await deleteFirebaseAuthUser(currentUser);
-      
+      // 2. Delete user profile document from Firestore
+      try {
+        await deleteDoc(doc(db, 'users', uid));
+      } catch (firestoreErr) {
+        console.error("Failed to delete user document from Firestore:", firestoreErr);
+      }
+
+      // 3. Clear from local storage
+      const localUsersStr = localStorage.getItem('flashmydeal_local_users');
+      if (localUsersStr) {
+        try {
+          const usersObj = JSON.parse(localUsersStr);
+          delete usersObj[uid];
+          localStorage.setItem('flashmydeal_local_users', JSON.stringify(usersObj));
+        } catch (lsErr) {
+          console.error('Error clearing local user profile cache:', lsErr);
+        }
+      }
+
+      // 4. Delete from Firebase Authentication
+      try {
+        await deleteFirebaseAuthUser(currentUser);
+      } catch (authErr: any) {
+        if (authErr.code === 'auth/requires-recent-login') {
+          alert("For security reasons, deleting your account requires a recent sign-in. Please log out, sign in again, and retry.");
+          return; // Stop here so they can sign in again as prompted.
+        } else {
+          console.error("Firebase auth delete failed:", authErr);
+          // If we can't delete from auth for other reasons, we alert and still proceed to clear local session
+          alert("Firebase Authentication removal failed: " + (authErr.message || authErr));
+        }
+      }
+
+      // 5. Sign out of Auth
+      await signOut(auth);
+
       alert("Your account and all linked details have been permanently deleted.");
-      window.location.reload();
+      
+      // 6. Redirect to landing page & refresh site automatically
+      window.location.href = window.location.origin;
     } catch (err: any) {
       console.error("Account deletion failed:", err);
-      if (err.code === 'auth/requires-recent-login') {
-        alert("For security reasons, deleting your account requires a recent sign-in. Please log out, sign in again, and retry.");
-      } else {
-        alert("Failed to delete account: " + (err.message || err));
-      }
+      alert("Failed to delete account completely: " + (err.message || err));
     }
   };
 

@@ -115,6 +115,20 @@ export default function ListingDetailModal({
                   </div>
                 )}
 
+                {/* Floating Favorite Heart Button (Top Left) */}
+                {onToggleFavorite && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleFavorite(listing.id);
+                    }}
+                    className="absolute top-3 left-3 z-20 p-2.5 rounded-xl bg-obsidian-950/80 border border-gray-850 hover:border-rose-500/50 hover:bg-obsidian-950 text-gray-400 hover:text-rose-500 transition-all backdrop-blur-md shadow-lg"
+                    title={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+                  >
+                    <Heart className={`w-4 h-4 ${isFavorite ? "text-rose-500 fill-rose-500" : ""}`} />
+                  </button>
+                )}
+
                 <img
                   src={images[activeImageIdx]}
                   alt={listing.title}
@@ -183,10 +197,25 @@ export default function ListingDetailModal({
                   </span>
                 </div>
 
-                {/* Title */}
-                <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white leading-tight">
-                  {listing.title}
-                </h2>
+                {/* Title and Favorite Button */}
+                <div className="flex items-start justify-between gap-4">
+                  <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white leading-tight flex-1">
+                    {listing.title}
+                  </h2>
+                  {onToggleFavorite && (
+                    <button
+                      onClick={() => onToggleFavorite(listing.id)}
+                      className={`p-3 rounded-xl border transition-all shrink-0 shadow-lg ${
+                        isFavorite 
+                          ? 'bg-rose-950/30 border-rose-500/40 text-rose-400 hover:bg-rose-950/50 hover:border-rose-500' 
+                          : 'bg-obsidian-950 border-gray-800 hover:border-gray-700 text-gray-400 hover:text-rose-500'
+                      }`}
+                      title={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+                    >
+                      <Heart className={`w-5.5 h-5.5 ${isFavorite ? "text-rose-500 fill-rose-500" : ""}`} />
+                    </button>
+                  )}
+                </div>
 
                 {/* Location & Date Row */}
                 <div className="flex items-center gap-4 text-xs text-gray-400 font-medium border-b border-gray-800 pb-4">

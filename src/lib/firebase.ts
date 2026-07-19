@@ -9,6 +9,7 @@ import {
   updateProfile,
   User
 } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDQpQA5eiW8aHgl6P-s1JNnhQRaX_tpnD0",
@@ -23,6 +24,7 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+export const db = getFirestore(app);
 
 export { 
   signInWithEmailAndPassword, 

@@ -46,7 +46,7 @@ This guide and script has been pre-configured with **your custom Google Drive pa
 // Configured to automatically upload images directly into your target Google Drive Folder!
 
 // YOUR CONFIGURED GOOGLE DRIVE PARENT FOLDER ID:
-var PARENT_FOLDER_ID = "1uogikRic7Gm7ZipK5GRGRyOvt9hSKiQM";
+var PARENT_FOLDER_ID = "118S9k1d99NxpC59pCoiJQjGCibk7x_V_";
 
 function doGet(e) {
   try {
