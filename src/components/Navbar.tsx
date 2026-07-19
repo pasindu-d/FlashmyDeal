@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Zap, LogIn, LogOut, User as UserIcon, ShieldAlert, CheckCircle2, Server, HelpCircle } from 'lucide-react';
+import { Zap, LogIn, LogOut, User as UserIcon, ShieldAlert, CheckCircle2, Server, HelpCircle, FileText, Check } from 'lucide-react';
 import { auth, signOut } from '../lib/firebase';
 import { User } from '../lib/firebase';
+import { getAppsScriptUrl, setAppsScriptUrl } from '../lib/appsScript';
 
 interface NavbarProps {
   user: User | null;
@@ -10,15 +11,28 @@ interface NavbarProps {
   storageStatus: {
     mode: string;
     connected: boolean;
-    rootFolderId: string;
     itemCount: number;
-    error?: string | null;
-    serviceAccountEmail?: string | null;
+    url?: string;
   } | null;
+  onAppsScriptUrlChange: () => void;
 }
 
-export default function Navbar({ user, onOpenAuth, onOpenPostAd, storageStatus }: NavbarProps) {
+export default function Navbar({ user, onOpenAuth, onOpenPostAd, storageStatus, onAppsScriptUrlChange }: NavbarProps) {
   const [showStatusTooltip, setShowStatusTooltip] = useState(false);
+  const [inputUrl, setInputUrl] = useState('');
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  useEffect(() => {
+    setInputUrl(getAppsScriptUrl());
+  }, [storageStatus?.url]);
+
+  const handleSaveUrl = (e: React.FormEvent) => {
+    e.preventDefault();
+    setAppsScriptUrl(inputUrl);
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 2500);
+    onAppsScriptUrlChange();
+  };
 
   const handleSignOut = async () => {
     try {
@@ -49,44 +63,100 @@ export default function Navbar({ user, onOpenAuth, onOpenPostAd, storageStatus }
           {/* Database & Connection Indicator */}
           <div className="hidden md:flex items-center gap-4">
             <div 
-              className="relative cursor-pointer"
-              onMouseEnter={() => setShowStatusTooltip(true)}
-              onMouseLeave={() => setShowStatusTooltip(false)}
-              onClick={() => setShowStatusTooltip(!showStatusTooltip)}
+              className="relative"
             >
-              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border ${
-                storageStatus?.mode === 'firebase'
-                  ? 'bg-emerald-950/30 border-emerald-500/30 text-emerald-400'
-                  : 'bg-amber-950/30 border-amber-500/30 text-amber-400'
-              }`}>
+              <div 
+                onClick={() => setShowStatusTooltip(!showStatusTooltip)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border cursor-pointer select-none transition-all ${
+                  storageStatus?.mode === 'apps_script'
+                    ? 'bg-emerald-950/30 border-emerald-500/30 text-emerald-400 hover:bg-emerald-950/50'
+                    : 'bg-amber-950/30 border-amber-500/30 text-amber-400 hover:bg-amber-950/50'
+                }`}
+              >
                 <Server className="w-3.5 h-3.5 animate-pulse" />
                 <span>
-                  {storageStatus?.mode === 'firebase' ? 'Firebase Live' : 'Local Database'}
+                  {storageStatus?.mode === 'apps_script' ? 'Sheets Live' : 'Local Storage (Sim)'}
                 </span>
               </div>
 
-              {/* Status Tooltip */}
+              {/* Status Tooltip / Config Dropdown */}
               {showStatusTooltip && (
-                <div className="absolute top-10 right-0 w-80 p-4 rounded-xl border border-gray-800 bg-obsidian-950/95 shadow-2xl backdrop-blur-md z-50 text-xs space-y-2 text-gray-300">
-                  <p className="font-bold text-white mb-1">Storage Engine Status</p>
-                  <p>
-                    <strong className="text-vibrant-teal">Engine Mode:</strong> {
-                      storageStatus?.mode === 'firebase' 
-                        ? 'Google Firebase Firestore (Cloud)' 
-                        : 'Local File JSON Database'
-                    }
-                  </p>
-                  <p>
-                    <strong className="text-vibrant-teal">Registry Cache:</strong> {storageStatus?.itemCount || 0} active ads
-                  </p>
-                  <p className="text-emerald-400 text-[11px] leading-relaxed">
-                    {storageStatus?.mode === 'firebase' ? (
-                      '✔ FlashmyDeal is successfully running on Google Firebase Firestore database. All listings, uploads, and profiles are safely synced with the cloud.'
-                    ) : (
-                      '✔ FlashmyDeal is running on local offline JSON database storage backup.'
-                    )}
-                  </p>
-                </div>
+                <>
+                  {/* Click outside backdrop */}
+                  <div className="fixed inset-0 z-40" onClick={() => setShowStatusTooltip(false)} />
+                  
+                  <div className="absolute top-10 right-0 w-85 p-5 rounded-2xl border border-gray-800 bg-obsidian-950 shadow-2xl backdrop-blur-md z-50 text-xs space-y-4 text-gray-300">
+                    <div className="flex items-center justify-between border-b border-gray-800 pb-2">
+                      <p className="font-extrabold text-white text-sm">Storage Engine Status</p>
+                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${
+                        storageStatus?.mode === 'apps_script' ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/20' : 'bg-amber-950 text-amber-400 border border-amber-500/20'
+                      }`}>
+                        {storageStatus?.mode === 'apps_script' ? 'Google Sheet' : 'Offline'}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 leading-relaxed text-gray-400">
+                      <p>
+                        <strong className="text-white font-semibold">Registry Cache:</strong> {storageStatus?.itemCount || 0} active ads
+                      </p>
+                      {storageStatus?.mode === 'apps_script' ? (
+                        <p className="text-emerald-400 text-[11px]">
+                          ✔ FlashmyDeal is connected directly to your Google Sheet database and Google Drive. All listings, uploads, and profiles are synced automatically.
+                        </p>
+                      ) : (
+                        <p className="text-amber-400 text-[11px]">
+                          💡 Currently running in local offline storage simulation mode. Deployed items are cached inside your web browser. Connect your Google Sheet below to save items permanently in Google Drive!
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Google Apps Script URL Input Form */}
+                    <form onSubmit={handleSaveUrl} className="space-y-2 border-t border-gray-800 pt-3">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                        Google Apps Script Web App URL
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="url"
+                          required
+                          value={inputUrl}
+                          onChange={(e) => setInputUrl(e.target.value)}
+                          placeholder="https://script.google.com/macros/s/.../exec"
+                          className="flex-1 bg-obsidian-900 border border-gray-800 rounded-lg py-1.5 px-2.5 text-xs text-white focus:outline-none focus:border-vibrant-teal"
+                        />
+                        <button
+                          type="submit"
+                          className="bg-vibrant-teal hover:opacity-90 text-obsidian-950 font-bold px-3 py-1.5 rounded-lg text-xs transition-all flex items-center justify-center shrink-0 min-w-[70px]"
+                        >
+                          {saveSuccess ? (
+                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                          ) : (
+                            'Connect'
+                          )}
+                        </button>
+                      </div>
+                      {saveSuccess && (
+                        <span className="text-[10px] text-emerald-400 font-semibold block mt-1">
+                          ✔ Backend connection updated! Reloading data...
+                        </span>
+                      )}
+                    </form>
+
+                    {/* Setup Guide Link */}
+                    <div className="bg-obsidian-900/60 p-2.5 rounded-xl border border-gray-850 text-[10px] text-gray-400 flex items-center gap-2">
+                      <FileText className="w-3.5 h-3.5 text-vibrant-teal" />
+                      <span>Need your own serverless API?</span>
+                      <a 
+                        href="/GOOGLE_APPS_SCRIPT.md" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-vibrant-teal hover:underline font-bold ml-auto"
+                      >
+                        Read Guide
+                      </a>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           </div>

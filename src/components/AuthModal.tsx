@@ -9,6 +9,7 @@ import {
   updateProfile
 } from '../lib/firebase';
 import { UserProfile } from '../types';
+import { apiGetUserProfile, apiSaveUserProfile } from '../lib/appsScript';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -47,8 +48,8 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
         const user = userCredential.user;
         
         // Fetch or create user profile on backend
-        let profileResponse = await fetch(`/api/users/${user.uid}`);
-        if (profileResponse.status === 404) {
+        let profile = await apiGetUserProfile(user.uid);
+        if (!profile) {
           // If profile doesn't exist on backend, create it
           const joinedDate = new Date().toLocaleDateString('en-US', {
             year: 'numeric',
@@ -66,11 +67,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
             listingRefs: []
           };
           
-          await fetch(`/api/users/${user.uid}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(newProfile),
-          });
+          await apiSaveUserProfile(newProfile);
         }
 
         // Check if user is verified
@@ -78,18 +75,14 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
           setMode('verify');
         } else {
           // Sync verification status to database
-          await fetch(`/api/users/${user.uid}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              uid: user.uid,
-              email: user.email,
-              displayName: user.displayName || 'Seller',
-              joinedDate: new Date().toLocaleDateString(),
-              verifiedStatus: true,
-              phone: '',
-              listingRefs: []
-            })
+          await apiSaveUserProfile({
+            uid: user.uid,
+            email: user.email || email,
+            displayName: user.displayName || 'Seller',
+            joinedDate: new Date().toLocaleDateString(),
+            verifiedStatus: true,
+            phone: '',
+            listingRefs: []
           });
           onAuthSuccess(user);
           onClose();
@@ -126,11 +119,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
           listingRefs: []
         };
 
-        await fetch(`/api/users/${user.uid}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newProfile),
-        });
+        await apiSaveUserProfile(newProfile);
 
         setMode('verify');
       }

@@ -21,7 +21,17 @@ import {
 import { auth, onAuthStateChanged } from './lib/firebase';
 import { User } from './lib/firebase';
 import { ProductListing, UserProfile, LOCATIONS, CATEGORIES } from './types';
-import { safeFetchJson, safeParseJson } from './lib/api';
+import { 
+  getAppsScriptUrl, 
+  setAppsScriptUrl, 
+  isUsingAppsScript, 
+  apiFetchListings, 
+  apiGetUserProfile, 
+  apiSaveUserProfile, 
+  apiCreateListing, 
+  apiUpdateListingStatus, 
+  apiDeleteListing 
+} from './lib/appsScript';
 
 // Import custom components
 import Navbar from './components/Navbar';
@@ -102,9 +112,13 @@ export default function App() {
 
   // Load storage status and listings on load
   useEffect(() => {
-    fetchStorageStatus();
     fetchListings();
   }, []);
+
+  // Update storage status when listings change
+  useEffect(() => {
+    fetchStorageStatus();
+  }, [listings]);
 
   // Listen to Auth state changes
   useEffect(() => {
@@ -113,19 +127,47 @@ export default function App() {
       if (user) {
         // Fetch full profile details
         try {
-          const profile = await safeFetchJson(`/api/users/${user.uid}`);
+          let profile = await apiGetUserProfile(user.uid);
+          if (!profile) {
+            // Profile does not exist in Sheets yet, auto-create and save it
+            const joinedDate = new Date().toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+            });
+            profile = {
+              uid: user.uid,
+              email: user.email || '',
+              displayName: user.displayName || user.email?.split('@')[0] || 'User',
+              joinedDate,
+              verifiedStatus: false,
+              phone: user.phoneNumber || '',
+              listingRefs: []
+            };
+            console.log('[App] Auto-creating and syncing missing profile to Sheets:', profile);
+            await apiSaveUserProfile(profile);
+          }
           setUserProfile(profile);
         } catch (e: any) {
           console.error('Error fetching profile:', e);
-          setUserProfile(null);
-          // Only show error if it is not the expected 'User not found' or 'not found' or 404 for a new user
-          const errorMsg = String(e?.message || e || '').toLowerCase();
-          if (errorMsg.includes('user not found') || errorMsg.includes('not found') || errorMsg.includes('404')) {
-            // New user or unregistered profile, completely normal on initial auth
-            console.log('No registered profile found yet for this user. A profile will be created upon first ad posting.');
-          } else {
-            showToast(`Profile Sync Error: ${e.message || e}`);
-          }
+          const joinedDate = new Date().toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          });
+          const fallbackProfile: UserProfile = {
+            uid: user.uid,
+            email: user.email || '',
+            displayName: user.displayName || user.email?.split('@')[0] || 'User',
+            joinedDate,
+            verifiedStatus: false,
+            phone: user.phoneNumber || '',
+            listingRefs: []
+          };
+          setUserProfile(fallbackProfile);
+          apiSaveUserProfile(fallbackProfile).catch((err) => {
+            console.error('[App] Failed to background-sync fallback profile:', err);
+          });
         }
       } else {
         setUserProfile(null);
@@ -135,20 +177,20 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  const fetchStorageStatus = async () => {
-    try {
-      const data = await safeFetchJson('/api/status');
-      setStorageStatus(data);
-    } catch (e: any) {
-      console.error('Error fetching storage status:', e);
-      showToast(`Database Engine Status Error: ${e.message || e}`);
-    }
+  const fetchStorageStatus = () => {
+    const configured = isUsingAppsScript();
+    setStorageStatus({
+      mode: configured ? 'apps_script' : 'local',
+      connected: true,
+      itemCount: listings.length,
+      url: getAppsScriptUrl()
+    });
   };
 
   const fetchListings = async () => {
     setLoading(true);
     try {
-      const data = await safeFetchJson('/api/listings');
+      const data = await apiFetchListings();
       setListings(data);
     } catch (e: any) {
       console.error('Error fetching listings:', e);
@@ -160,19 +202,13 @@ export default function App() {
 
   const handleMarkAsSold = async (listingId: string) => {
     try {
-      await safeFetchJson(`/api/listings/${listingId}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'sold' }),
-      });
+      await apiUpdateListingStatus(listingId, 'sold');
       // Update local state listing
       setListings(prev => 
         prev.map(l => l.id === listingId ? { ...l, status: 'sold' } : l)
       );
       // Also update details modal
       setSelectedListing(prev => prev && prev.id === listingId ? { ...prev, status: 'sold' } : prev);
-      // Refresh cache
-      fetchStorageStatus();
       showToast('Deal marked as sold successfully!', 'success');
     } catch (e: any) {
       console.error('Error marking listing as sold:', e);
@@ -182,15 +218,11 @@ export default function App() {
 
   const handleDeleteListing = async (listingId: string) => {
     try {
-      await safeFetchJson(`/api/listings/${listingId}`, {
-        method: 'DELETE',
-      });
+      await apiDeleteListing(listingId);
       // Remove from state
       setListings(prev => prev.filter(l => l.id !== listingId));
       // Close detail modal
       setSelectedListing(null);
-      // Refresh cache
-      fetchStorageStatus();
       showToast('Deal listing deleted permanently!', 'success');
     } catch (e: any) {
       console.error('Error deleting listing:', e);
@@ -228,17 +260,12 @@ export default function App() {
   const handleAuthSuccess = async (user: User) => {
     setCurrentUser(user);
     try {
-      const profile = await safeFetchJson(`/api/users/${user.uid}`);
+      const profile = await apiGetUserProfile(user.uid);
       setUserProfile(profile);
       showToast('Authentication successful!', 'success');
     } catch (e: any) {
       console.error(e);
-      if (e.message && e.message.includes('User not found')) {
-        // User has authenticated but hasn't created a profile yet - this is successful authentication!
-        showToast('Authentication successful!', 'success');
-      } else {
-        showToast(`Auth sync failed: ${e.message || e}`);
-      }
+      showToast(`Auth sync failed: ${e.message || e}`);
     }
   };
 
@@ -246,7 +273,13 @@ export default function App() {
     setListings(prev => [newListing, ...prev]);
     // Refresh counters
     fetchStorageStatus();
-    showToast('Deal listing published successfully!', 'success');
+    
+    if (newListing.imageErrors && newListing.imageErrors.length > 0) {
+      console.warn('[App] Listing published with image errors:', newListing.imageErrors);
+      showToast(`Ad published, but images failed to upload: ${newListing.imageErrors[0]}`, 'error');
+    } else {
+      showToast('Deal listing published successfully!', 'success');
+    }
   };
 
   const handleClearFilters = () => {
@@ -330,6 +363,7 @@ export default function App() {
         }} 
         onOpenPostAd={handlePostAdClick}
         storageStatus={storageStatus}
+        onAppsScriptUrlChange={fetchListings}
       />
 
       {/* Hero Header with Search Panel */}

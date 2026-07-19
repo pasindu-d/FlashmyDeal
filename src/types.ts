@@ -25,6 +25,7 @@ export interface ProductListing {
   status: 'active' | 'sold' | 'inactive';
   images: string[]; // URLs or base64 paths
   phone: string;
+  imageErrors?: string[]; // debugging info for image uploads
 }
 
 export interface GlobalRegistry {

@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { motion } from 'motion/react';
 import { X, Upload, CheckCircle2, AlertTriangle, ArrowRight, ArrowLeft, Loader2, Sparkles, TrendingDown } from 'lucide-react';
 import { CATEGORIES, LOCATIONS, ProductListing } from '../types';
-import { safeParseJson } from '../lib/api';
+import { apiCreateListing } from '../lib/appsScript';
 
 interface AdPostingFormProps {
   isOpen: boolean;
@@ -168,6 +168,7 @@ export default function AdPostingForm({ isOpen, onClose, userId, userName, userP
         title,
         price: Number(price),
         originalPrice: originalPrice ? Number(originalPrice) : undefined,
+        currency: 'LKR' as const,
         category,
         condition,
         location,
@@ -178,67 +179,28 @@ export default function AdPostingForm({ isOpen, onClose, userId, userName, userP
         sellerName: userName,
       };
 
-      let response;
-      try {
-        // Try JSON submission with Base64 images first (100% reliable on Vercel/Serverless platforms)
-        console.log('Preparing images as Base64 for highly reliable JSON transfer...');
-        const base64Images = [];
-        for (let i = 0; i < selectedImages.length; i++) {
-          const imgObj = selectedImages[i];
-          const compressedBlob = await compressImage(imgObj.file);
-          const base64Data = await blobToBase64(compressedBlob);
-          base64Images.push({
-            name: `compressed_img_${i + 1}.jpg`,
-            data: base64Data,
-            type: 'image/jpeg'
-          });
-        }
-
-        const jsonPayload = {
-          ...metadata,
-          images: base64Images,
-        };
-
-        console.log('Sending JSON payload to server...');
-        response = await fetch('/api/listings', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(jsonPayload),
-        });
-      } catch (jsonErr) {
-        console.warn('JSON preparation failed, trying multipart/form-data as fallback:', jsonErr);
-        // Fallback to standard multipart form data
-        const formData = new FormData();
-        formData.append('metadata', JSON.stringify(metadata));
-        for (let i = 0; i < selectedImages.length; i++) {
-          const imgObj = selectedImages[i];
-          const compressedBlob = await compressImage(imgObj.file);
-          formData.append('images', compressedBlob, `compressed_img_${i + 1}.jpg`);
+      console.log('Preparing images as Base64 for Google Drive upload...');
+      const base64Images = [];
+      for (let i = 0; i < selectedImages.length; i++) {
+        const imgObj = selectedImages[i];
+        let blobToUse: Blob;
+        try {
+          blobToUse = await compressImage(imgObj.file);
+        } catch (compErr) {
+          console.warn('Image compression failed, falling back to original file:', compErr);
+          blobToUse = imgObj.file;
         }
         
-        console.log('Sending multipart payload to server...');
-        response = await fetch('/api/listings', {
-          method: 'POST',
-          body: formData,
+        const base64Data = await blobToBase64(blobToUse);
+        base64Images.push({
+          name: imgObj.file.name || `compressed_img_${i + 1}.jpg`,
+          data: base64Data,
+          type: imgObj.file.type || 'image/jpeg'
         });
       }
 
-      if (!response.ok) {
-        let errorMsg = 'Failed to submit deal listing.';
-        try {
-          const errorData = await safeParseJson(response);
-          errorMsg = errorData.error || errorMsg;
-        } catch (parseErr: any) {
-          console.error('[AdPostingForm] Error parsing non-OK response:', parseErr);
-          errorMsg = parseErr.message || errorMsg;
-        }
-        throw new Error(errorMsg);
-      }
-
-      console.log('[AdPostingForm] Response status is OK, parsing successful listing payload...');
-      const newListing = await safeParseJson(response);
+      console.log('Publishing listing to Google Sheets database...');
+      const newListing = await apiCreateListing(metadata, base64Images);
       console.log('Deal published successfully:', newListing);
       
       onSuccess(newListing);
