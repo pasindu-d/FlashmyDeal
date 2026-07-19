@@ -144,6 +144,49 @@ function doPost(e) {
         }
       }
     }
+
+    if (action === 'sendContactEmail') {
+      var name = postData.name;
+      var subject = postData.subject;
+      var message = postData.message;
+      
+      var email = "wmpdhananjaya@gmail.com";
+      var emailSubject = "[Contact Us] " + subject;
+      var body = "You have received a new message from the Contact Us form on FlashmyDeal:\n\n" +
+                 "Name: " + name + "\n" +
+                 "Subject: " + subject + "\n" +
+                 "Message:\n" + message + "\n\n" +
+                 "Best regards,\nFlashmyDeal Team";
+                 
+      var htmlBody = "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 12px; background-color: #060911; color: #ffffff;'>" +
+                     "<h2 style='color: #00f2fe; border-bottom: 1px solid #111827; padding-bottom: 12px; margin-bottom: 24px;'>New Contact Us Submission</h2>" +
+                     "<p style='font-size: 14px; color: #94a3b8;'><strong>Name:</strong> " + name + "</p>" +
+                     "<p style='font-size: 14px; color: #94a3b8;'><strong>Subject:</strong> " + subject + "</p>" +
+                     "<div style='background-color: #111827; padding: 15px; border-radius: 8px; border: 1px solid #1f2937; margin-top: 15px; min-height: 100px;'>" +
+                     "<p style='font-size: 14px; color: #f3f4f6; margin: 0; white-space: pre-wrap;'>" + message + "</p>" +
+                     "</div>" +
+                     "<hr style='border: 0; border-top: 1px solid #111827; margin: 24px 0;'>" +
+                     "<p style='font-size: 11px; text-align: center; color: #475569;'>Sent securely from your FlashmyDeal personal portal</p>" +
+                     "</div>";
+
+      try {
+        GmailApp.sendEmail(email, emailSubject, body, {
+          name: "FlashmyDeal Contact",
+          htmlBody: htmlBody
+        });
+        return jsonResponse({ success: true });
+      } catch (e) {
+        try {
+          MailApp.sendEmail(email, emailSubject, body, {
+            name: "FlashmyDeal Contact",
+            htmlBody: htmlBody
+          });
+          return jsonResponse({ success: true });
+        } catch (err) {
+          return jsonResponse({ error: "Failed to send email: " + err.toString() });
+        }
+      }
+    }
     
     return jsonResponse({ error: 'Invalid action: ' + action });
   } catch (err) {

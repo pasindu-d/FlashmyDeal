@@ -574,3 +574,49 @@ export async function apiSendVerificationEmail(email: string, name: string, code
     return false;
   }
 }
+
+/**
+ * SEND CONTACT US EMAIL VIA GOOGLE APPS SCRIPT
+ */
+export async function apiSendContactEmail(name: string, subject: string, message: string): Promise<boolean> {
+  const url = getAppsScriptUrl();
+  if (!url) {
+    console.log('[AppsScript Client] Offline Mode: Mock sending contact email locally.');
+    console.log('Name:', name, 'Subject:', subject, 'Message:', message);
+    return true;
+  }
+
+  try {
+    const response = await fetch('/api/proxy', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url,
+        payload: {
+          action: 'sendContactEmail',
+          name,
+          subject,
+          message
+        }
+      })
+    });
+    
+    let data: any;
+    try {
+      data = await response.json();
+    } catch (parseErr) {
+      throw new Error('Failed to parse response from server proxy.');
+    }
+
+    if (!response.ok || (data && data.error)) {
+      throw new Error(data?.error || `Server responded with status ${response.status}`);
+    }
+
+    return !!(data && data.success);
+  } catch (err: any) {
+    console.error('[AppsScript Client] Sending contact email failed:', err);
+    throw err;
+  }
+}

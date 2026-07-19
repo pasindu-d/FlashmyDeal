@@ -16,7 +16,8 @@ import {
   Briefcase,
   AlertCircle,
   X,
-  Heart
+  Heart,
+  Share2
 } from 'lucide-react';
 import { auth, onAuthStateChanged } from './lib/firebase';
 import { User } from './lib/firebase';
@@ -40,6 +41,7 @@ import ListingCard from './components/ListingCard';
 import ListingDetailModal from './components/ListingDetailModal';
 import AuthModal from './components/AuthModal';
 import AdPostingForm from './components/AdPostingForm';
+import ContactUs from './components/ContactUs';
 
 export default function App() {
   // Global auth state
@@ -82,6 +84,9 @@ export default function App() {
   // Layout preference
   const [layoutMode, setLayoutMode] = useState<'grid' | 'list'>('grid');
 
+  // Navigation View State
+  const [currentView, setCurrentView] = useState<'listings' | 'contact'>('listings');
+
   // Favorites local persistence state
   const [favorites, setFavorites] = useState<string[]>(() => {
     try {
@@ -109,6 +114,71 @@ export default function App() {
       return next;
     });
   };
+
+  const copyToClipboard = (url: string) => {
+    navigator.clipboard.writeText(url).then(() => {
+      showToast('Shareable link copied to clipboard!', 'success');
+    }).catch((err) => {
+      console.error('Failed to copy link:', err);
+      showToast('Failed to copy share link.', 'error');
+    });
+  };
+
+  const handleShare = async (e: React.MouseEvent, listingId: string, title: string) => {
+    e.stopPropagation();
+    const shareUrl = `${window.location.origin}${window.location.pathname}?listing=${listingId}`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `FlashmyDeal - ${title}`,
+          text: `Check out this deal on FlashmyDeal: ${title}`,
+          url: shareUrl,
+        });
+        showToast('Deal shared successfully!', 'success');
+      } catch (err: any) {
+        if (err.name !== 'AbortError') {
+          console.error('Error sharing via Web Share API:', err);
+          copyToClipboard(shareUrl);
+        }
+      }
+    } else {
+      copyToClipboard(shareUrl);
+    }
+  };
+
+  // Auto-open listing from share link on load
+  useEffect(() => {
+    if (listings.length > 0) {
+      const params = new URLSearchParams(window.location.search);
+      const sharedListingId = params.get('listing');
+      if (sharedListingId) {
+        const found = listings.find(l => l.id === sharedListingId);
+        if (found) {
+          setSelectedListing(found);
+        }
+      }
+    }
+  }, [listings]);
+
+  // Keep URL search params in sync with active selectedListing state
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (selectedListing) {
+      if (params.get('listing') !== selectedListing.id) {
+        params.set('listing', selectedListing.id);
+        const newUrl = `${window.location.pathname}?${params.toString()}`;
+        window.history.replaceState({ path: newUrl }, '', newUrl);
+      }
+    } else {
+      if (params.has('listing')) {
+        params.delete('listing');
+        const query = params.toString();
+        const newUrl = `${window.location.pathname}${query ? `?${query}` : ''}`;
+        window.history.replaceState({ path: newUrl }, '', newUrl);
+      }
+    }
+  }, [selectedListing]);
 
   // Load storage status and listings on load
   useEffect(() => {
@@ -383,19 +453,29 @@ export default function App() {
           setAuthModalOpen(true);
         }} 
         onOpenPostAd={handlePostAdClick}
+        onNavigate={(view) => setCurrentView(view)}
       />
 
-      {/* Hero Header with Search Panel */}
-      <Hero 
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        selectedCategory={selectedCategory}
-        setSelectedCategory={setSelectedCategory}
-        selectedLocation={selectedLocation}
-        setSelectedLocation={setSelectedLocation}
-        onClearFilters={handleClearFilters}
-        hasFilters={hasActiveFilters}
-      />
+      {currentView === 'contact' ? (
+        <ContactUs 
+          onBack={() => setCurrentView('listings')}
+          showToast={showToast}
+          initialUserEmail={currentUser?.email || undefined}
+          initialUserName={userProfile?.displayName || currentUser?.displayName || undefined}
+        />
+      ) : (
+        <>
+          {/* Hero Header with Search Panel */}
+          <Hero 
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            selectedCategory={selectedCategory}
+            setSelectedCategory={setSelectedCategory}
+            selectedLocation={selectedLocation}
+            setSelectedLocation={setSelectedLocation}
+            onClearFilters={handleClearFilters}
+            hasFilters={hasActiveFilters}
+          />
 
       {/* Unverified Email Warning bar if logged in but not verified */}
       {currentUser && !currentUser.emailVerified && !userProfile?.verifiedStatus && (
@@ -647,6 +727,7 @@ export default function App() {
                       onClick={() => setSelectedListing(listing)} 
                       isFavorite={favorites.includes(listing.id)}
                       onToggleFavorite={toggleFavorite}
+                      onShare={handleShare}
                     />
                   ))}
                 </div>
@@ -696,16 +777,28 @@ export default function App() {
                             LKR {(Number(listing.price) || 0).toLocaleString()}
                           </span>
                         </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleFavorite(listing.id);
-                          }}
-                          className="p-1.5 rounded-lg bg-obsidian-900 border border-gray-800 hover:border-rose-500/50 hover:bg-obsidian-950 text-gray-400 hover:text-rose-500 transition-all"
-                          title={favorites.includes(listing.id) ? "Remove from Favorites" : "Add to Favorites"}
-                        >
-                          <Heart className={`w-3.5 h-3.5 ${favorites.includes(listing.id) ? "text-rose-500 fill-rose-500" : ""}`} />
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleShare(e, listing.id, listing.title);
+                            }}
+                            className="p-1.5 rounded-lg bg-obsidian-900 border border-gray-800 hover:border-vibrant-teal/50 hover:bg-obsidian-950 text-gray-400 hover:text-vibrant-teal transition-all"
+                            title="Share Deal"
+                          >
+                            <Share2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleFavorite(listing.id);
+                            }}
+                            className="p-1.5 rounded-lg bg-obsidian-900 border border-gray-800 hover:border-rose-500/50 hover:bg-obsidian-950 text-gray-400 hover:text-rose-500 transition-all"
+                            title={favorites.includes(listing.id) ? "Remove from Favorites" : "Add to Favorites"}
+                          >
+                            <Heart className={`w-3.5 h-3.5 ${favorites.includes(listing.id) ? "text-rose-500 fill-rose-500" : ""}`} />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -734,6 +827,8 @@ export default function App() {
         </div>
 
       </main>
+      </>
+      )}
 
       {/* Footer Block */}
       <footer className="border-t border-gray-900 bg-obsidian-950/60 py-10 mt-20 text-center text-xs text-gray-500 space-y-2">
@@ -773,6 +868,7 @@ export default function App() {
             currentUserId={currentUser?.uid}
             isFavorite={favorites.includes(selectedListing.id)}
             onToggleFavorite={toggleFavorite}
+            onShare={handleShare}
           />
         )}
       </AnimatePresence>

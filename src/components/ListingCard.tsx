@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { MapPin, Tag, Calendar, Sparkles, TrendingDown, ShieldCheck, Heart } from 'lucide-react';
+import { MapPin, Tag, Calendar, Sparkles, TrendingDown, ShieldCheck, Heart, Share2 } from 'lucide-react';
 import { ProductListing } from '../types';
 
 interface ListingCardProps {
@@ -9,9 +9,10 @@ interface ListingCardProps {
   onClick: () => void;
   isFavorite?: boolean;
   onToggleFavorite?: (id: string) => void;
+  onShare?: (e: React.MouseEvent, id: string, title: string) => void;
 }
 
-export default function ListingCard({ listing, onClick, isFavorite = false, onToggleFavorite }: ListingCardProps) {
+export default function ListingCard({ listing, onClick, isFavorite = false, onToggleFavorite, onShare }: ListingCardProps) {
   const isSold = listing.status === 'sold';
   
   // Format price drop percentage
@@ -83,6 +84,20 @@ export default function ListingCard({ listing, onClick, isFavorite = false, onTo
         <div className="absolute bottom-3 left-3 px-2 py-0.5 rounded text-[9px] font-semibold tracking-wider bg-black/60 text-gray-300 backdrop-blur-sm">
           {listing.condition}
         </div>
+
+        {/* Share Button */}
+        {onShare && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onShare(e, listing.id, listing.title);
+            }}
+            className="absolute bottom-2.5 right-11 z-20 p-1.5 rounded-lg bg-obsidian-900/90 border border-gray-800 hover:border-vibrant-teal/50 hover:bg-obsidian-950 text-gray-400 hover:text-vibrant-teal transition-all backdrop-blur-md"
+            title="Share Deal"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+          </button>
+        )}
 
         {/* Favorite Heart Button */}
         {onToggleFavorite && (

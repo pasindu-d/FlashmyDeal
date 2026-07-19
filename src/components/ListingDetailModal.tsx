@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, MapPin, Phone, ShieldAlert, Calendar, User, Tag, ShieldCheck, HelpCircle, Heart } from 'lucide-react';
+import { X, MapPin, Phone, ShieldAlert, Calendar, User, Tag, ShieldCheck, HelpCircle, Heart, Share2 } from 'lucide-react';
 import { ProductListing } from '../types';
 
 interface ListingDetailModalProps {
@@ -11,6 +11,7 @@ interface ListingDetailModalProps {
   currentUserId?: string | null;
   isFavorite?: boolean;
   onToggleFavorite?: (id: string) => void;
+  onShare?: (e: React.MouseEvent, id: string, title: string) => void;
 }
 
 export default function ListingDetailModal({ 
@@ -20,7 +21,8 @@ export default function ListingDetailModal({
   onDeleteListing, 
   currentUserId,
   isFavorite = false,
-  onToggleFavorite
+  onToggleFavorite,
+  onShare
 }: ListingDetailModalProps) {
   if (!listing) return null;
 
@@ -197,24 +199,35 @@ export default function ListingDetailModal({
                   </span>
                 </div>
 
-                {/* Title and Favorite Button */}
+                {/* Title and Action Buttons */}
                 <div className="flex items-start justify-between gap-4">
                   <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white leading-tight flex-1">
                     {listing.title}
                   </h2>
-                  {onToggleFavorite && (
-                    <button
-                      onClick={() => onToggleFavorite(listing.id)}
-                      className={`p-3 rounded-xl border transition-all shrink-0 shadow-lg ${
-                        isFavorite 
-                          ? 'bg-rose-950/30 border-rose-500/40 text-rose-400 hover:bg-rose-950/50 hover:border-rose-500' 
-                          : 'bg-obsidian-950 border-gray-800 hover:border-gray-700 text-gray-400 hover:text-rose-500'
-                      }`}
-                      title={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
-                    >
-                      <Heart className={`w-5.5 h-5.5 ${isFavorite ? "text-rose-500 fill-rose-500" : ""}`} />
-                    </button>
-                  )}
+                  <div className="flex gap-2 shrink-0">
+                    {onShare && (
+                      <button
+                        onClick={(e) => onShare(e, listing.id, listing.title)}
+                        className="p-3 rounded-xl border bg-obsidian-950 border-gray-800 hover:border-vibrant-teal/50 hover:bg-obsidian-900 text-gray-400 hover:text-vibrant-teal transition-all shadow-lg"
+                        title="Share Deal"
+                      >
+                        <Share2 className="w-5.5 h-5.5" />
+                      </button>
+                    )}
+                    {onToggleFavorite && (
+                      <button
+                        onClick={() => onToggleFavorite(listing.id)}
+                        className={`p-3 rounded-xl border transition-all shadow-lg ${
+                          isFavorite 
+                            ? 'bg-rose-950/30 border-rose-500/40 text-rose-400 hover:bg-rose-950/50 hover:border-rose-500' 
+                            : 'bg-obsidian-950 border-gray-800 hover:border-gray-700 text-gray-400 hover:text-rose-500'
+                        }`}
+                        title={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+                      >
+                        <Heart className={`w-5.5 h-5.5 ${isFavorite ? "text-rose-500 fill-rose-500" : ""}`} />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Location & Date Row */}
@@ -285,6 +298,17 @@ export default function ListingDetailModal({
                     </a>
                   )}
                 </div>
+
+                {/* Share Link Button */}
+                {onShare && (
+                  <button
+                    onClick={(e) => onShare(e, listing.id, listing.title)}
+                    className="w-full py-3 px-4 rounded-xl font-bold flex items-center justify-center gap-2 text-xs uppercase tracking-wider transition-all border bg-obsidian-950 border-gray-800 hover:border-vibrant-teal/45 text-gray-300 hover:text-vibrant-teal hover:bg-obsidian-900"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    Share Listing Link
+                  </button>
+                )}
 
                 {/* Favorite Item Toggle Button */}
                 {onToggleFavorite && (

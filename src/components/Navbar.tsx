@@ -11,9 +11,10 @@ interface NavbarProps {
   userProfile: UserProfile | null;
   onOpenAuth: (mode: 'login' | 'signup') => void;
   onOpenPostAd: () => void;
+  onNavigate?: (view: 'listings' | 'contact') => void;
 }
 
-export default function Navbar({ user, userProfile, onOpenAuth, onOpenPostAd }: NavbarProps) {
+export default function Navbar({ user, userProfile, onOpenAuth, onOpenPostAd, onNavigate }: NavbarProps) {
   const [showDropdown, setShowDropdown] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -162,7 +163,11 @@ export default function Navbar({ user, userProfile, onOpenAuth, onOpenPostAd }: 
         <div className="flex h-16 items-center justify-between">
           
           {/* Logo */}
-          <div className="flex items-center gap-2">
+          <div 
+            onClick={() => onNavigate?.('listings')}
+            className="flex items-center gap-2 cursor-pointer select-none hover:opacity-90 active:scale-[0.98] transition-all"
+            id="nav-logo"
+          >
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-vibrant-teal to-blue-600 shadow-[0_0_15px_rgba(0,242,254,0.3)]">
               <Zap className="h-5 w-5 text-obsidian-950 stroke-[2.5]" />
             </div>
@@ -172,6 +177,25 @@ export default function Navbar({ user, userProfile, onOpenAuth, onOpenPostAd }: 
               </span>
               <span className="block text-[10px] font-mono tracking-wider text-gray-500 uppercase leading-none">Classifieds</span>
             </div>
+          </div>
+
+          {/* Nav links */}
+          <div className="hidden md:flex items-center gap-6 ml-8 mr-auto">
+            <button
+              onClick={() => onNavigate?.('listings')}
+              className="text-xs font-bold uppercase tracking-wider text-gray-400 hover:text-white transition-colors cursor-pointer"
+              id="nav-link-browse"
+            >
+              Browse
+            </button>
+            <button
+              onClick={() => onNavigate?.('contact')}
+              className="text-xs font-bold uppercase tracking-wider text-gray-400 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
+              id="nav-link-contact"
+            >
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-vibrant-teal animate-pulse"></span>
+              Contact Us
+            </button>
           </div>
 
           {/* Action Area */}
@@ -282,6 +306,21 @@ export default function Navbar({ user, userProfile, onOpenAuth, onOpenPostAd }: 
                           </button>
                         </div>
 
+                        {/* Contact Us Option */}
+                        <button
+                          onClick={() => {
+                            setShowDropdown(false);
+                            onNavigate?.('contact');
+                          }}
+                          className="flex items-center gap-2 w-full px-2.5 py-2 rounded-xl text-xs font-semibold text-gray-300 hover:text-white hover:bg-white/5 transition-all text-left cursor-pointer"
+                          id="dropdown-contact-btn"
+                        >
+                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          </svg>
+                          Contact Us
+                        </button>
+
                         {/* Spacer/Divider */}
                         <div className="border-t border-gray-800 my-1" />
 
@@ -312,6 +351,14 @@ export default function Navbar({ user, userProfile, onOpenAuth, onOpenPostAd }: 
               </div>
             ) : (
               <div className="flex items-center gap-2">
+                {/* Contact Us button on mobile when logged out */}
+                <button
+                  onClick={() => onNavigate?.('contact')}
+                  className="inline-flex md:hidden px-2.5 py-1.5 rounded-lg text-xs font-bold text-gray-400 hover:text-white transition-colors"
+                  id="nav-mobile-contact-btn"
+                >
+                  Contact
+                </button>
                 <button
                   onClick={() => onOpenAuth('login')}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-300 hover:text-white hover:bg-white/5 transition-all"
