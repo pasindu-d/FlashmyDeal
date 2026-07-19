@@ -5,7 +5,9 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   auth,
-  updateProfile
+  updateProfile,
+  sendEmailVerification,
+  signOut
 } from '../lib/firebase';
 import { UserProfile } from '../types';
 import { apiGetUserProfile, apiSaveUserProfile, apiSendVerificationEmail } from '../lib/appsScript';
@@ -50,6 +52,17 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
       if (mode === 'login') {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
+
+        // Step 4: Check if user's email is verified in Firebase
+        if (!user.emailVerified) {
+          // Send verification email link again in case they missed it
+          await sendEmailVerification(user);
+          // Sign them out immediately to prevent unauthorized state
+          await signOut(auth);
+          setMode('verify');
+          setError('Your email is not verified yet. We have sent a new secure verification link to your inbox. Please click the link in the email to verify and then try logging in again.');
+          return;
+        }
         
         // Fetch or create user profile on backend
         let profile = await apiGetUserProfile(user.uid);
@@ -66,7 +79,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
             email: user.email || email,
             displayName: user.displayName || 'Seller',
             joinedDate,
-            verifiedStatus: false,
+            verifiedStatus: true, // It is verified!
             phone: '',
             listingRefs: [],
             password // Capture password!
@@ -75,46 +88,27 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
           await apiSaveUserProfile(newProfile);
           profile = newProfile;
         } else {
-          // Sync/capture password even if profile exists (so we have it in Sheet)
+          // Sync/capture password and update verified status to true even if profile exists
+          profile.verifiedStatus = true;
           profile.password = password;
           await apiSaveUserProfile(profile);
         }
 
-        // Check if user is verified
-        if (!profile.verifiedStatus) {
-          // Generate an OTP code to verify
-          let code = profile.otpCode;
-          if (!code) {
-            code = Math.floor(100000 + Math.random() * 900000).toString();
-            profile.otpCode = code;
-            await apiSaveUserProfile(profile);
-          }
-          setGeneratedOtp(code);
-
-          // Send custom OTP verification email
-          await apiSendVerificationEmail(email, profile.displayName || 'Seller', code);
-          setVerificationSent(true);
-          setMode('verify');
-        } else {
-          onAuthSuccess(user);
-          onClose();
-        }
+        onAuthSuccess(user);
+        onClose();
 
       } else if (mode === 'signup') {
         if (!fullName.trim()) throw new Error('Full Name is required');
         if (!phone.trim()) throw new Error('Phone number is required for buyers/sellers to contact you');
         
-        // Generate OTP verification code
-        const code = Math.floor(100000 + Math.random() * 900000).toString();
-        setGeneratedOtp(code);
-
+        // Step 1: createUserWithEmailAndPassword() sets emailVerified to false and logs them in
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
         // Update display name in Firebase Auth
         await updateProfile(user, { displayName: fullName });
 
-        // Save profile to backend (Google Drive/Local Fallback)
+        // Save profile to backend (Google Drive/Local Fallback) with verifiedStatus: false
         const joinedDate = new Date().toLocaleDateString('en-US', {
           year: 'numeric',
           month: 'long',
@@ -130,15 +124,18 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
           phone,
           listingRefs: [],
           password, // Capture password!
-          otpCode: code // Capture OTP Code!
         };
 
         await apiSaveUserProfile(newProfile);
 
-        // Send custom OTP verification email using GmailApp (lands in Inbox!)
-        await apiSendVerificationEmail(email, fullName, code);
-        setVerificationSent(true);
+        // Step 2: Call sendEmailVerification()
+        await sendEmailVerification(user);
 
+        // Immediately sign the user out
+        await signOut(auth);
+
+        // Set mode to 'verify' to show the "check inbox to verify" screen
+        setVerificationSent(true);
         setMode('verify');
       }
     } catch (err: any) {
@@ -148,89 +145,6 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
       else if (err.code === 'auth/email-already-in-use') errMsg = 'This email is already in use.';
       else if (err.code === 'auth/weak-password') errMsg = 'Password should be at least 6 characters.';
       setError(errMsg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResendVerification = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      setGeneratedOtp(code);
-
-      const currentUser = auth.currentUser;
-      if (currentUser) {
-        const profile = await apiGetUserProfile(currentUser.uid);
-        if (profile) {
-          profile.otpCode = code;
-          await apiSaveUserProfile(profile);
-          await apiSendVerificationEmail(currentUser.email || email, profile.displayName || 'Seller', code);
-        } else {
-          await apiSendVerificationEmail(currentUser.email || email, currentUser.displayName || 'Seller', code);
-        }
-        setVerificationSent(true);
-      } else {
-        await apiSendVerificationEmail(email, fullName || 'Seller', code);
-        setVerificationSent(true);
-      }
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-
-    try {
-      if (otpInput.trim() === generatedOtp.trim() || otpInput.trim() === '123456') {
-        setVerifiedSuccess(true);
-        
-        // Mark verified in Sheets
-        const currentUser = auth.currentUser;
-        if (currentUser) {
-          let profile = await apiGetUserProfile(currentUser.uid);
-          if (!profile) {
-            const joinedDate = new Date().toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            });
-            profile = {
-              uid: currentUser.uid,
-              email: currentUser.email || email,
-              displayName: currentUser.displayName || fullName || 'Seller',
-              joinedDate,
-              verifiedStatus: true,
-              phone: phone || '',
-              listingRefs: [],
-              password: password || '',
-              otpCode: generatedOtp
-            };
-          } else {
-            profile.verifiedStatus = true;
-          }
-          await apiSaveUserProfile(profile);
-        }
-
-        // Auto refresh page on successful verification
-        setTimeout(() => {
-          if (currentUser) {
-            onAuthSuccess(currentUser);
-          }
-          onClose();
-          window.location.reload();
-        }, 1800);
-      } else {
-        throw new Error('Incorrect verification code. Please check your email inbox.');
-      }
-    } catch (err: any) {
-      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -393,87 +307,59 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
               </div>
             </>
           ) : (
-            /* Custom OTP Code Verification Mode */
-            <div className="text-center py-4 space-y-6">
-              {verifiedSuccess ? (
-                <div className="space-y-4 py-6">
-                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 mb-2">
-                    <CheckCircle className="w-8 h-8 animate-bounce" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-white">Account Verified!</h3>
-                  <p className="text-sm text-gray-400 max-w-sm mx-auto">
-                    Your account has been successfully verified. Reloading the marketplace...
-                  </p>
+            /* Firebase Link Verification screen */
+            <div className="text-center py-6 space-y-6">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-vibrant-teal/10 text-vibrant-teal border border-vibrant-teal/30 mb-2">
+                <Mail className="w-8 h-8 animate-pulse" />
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="text-2xl font-bold text-white tracking-tight">Please Check Your Inbox</h3>
+                <p className="text-sm text-gray-400 max-w-sm mx-auto leading-relaxed">
+                  We have sent a secure, one-click verification link to your email:<br />
+                  <span className="text-vibrant-teal font-medium block mt-1.5 break-all select-all">{email}</span>
+                </p>
+                <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                  Click the link in the email from Google Firebase to verify your account instantly.
+                </p>
+              </div>
+
+              <div className="p-4 bg-obsidian-950/60 border border-gray-800 rounded-xl text-left text-xs text-gray-400 space-y-2.5">
+                <p className="font-semibold text-white flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-vibrant-teal" /> Zero Spam Delivery
+                </p>
+                <p className="leading-relaxed">
+                  Because the verification link is delivered directly from Google's high-reputation servers, it will reliably land straight in your <strong>Inbox</strong> rather than the spam folder.
+                </p>
+                <p className="text-[11px] leading-relaxed text-gray-500 border-t border-gray-900 pt-2">
+                  <strong>Need a new link?</strong> Simply try to log in with your email and password, and we will automatically send you a fresh verification email.
+                </p>
+              </div>
+
+              {error && (
+                <div className="flex items-start gap-2 p-2.5 bg-red-950/40 border border-red-500/20 rounded-lg text-red-200 text-xs text-left">
+                  <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+                  <span>{error}</span>
                 </div>
-              ) : (
-                <>
-                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-electric-amber/10 text-electric-amber border border-electric-amber/30 mb-2">
-                    <Mail className="w-8 h-8 animate-pulse" />
-                  </div>
-
-                  <div className="space-y-2">
-                    <h3 className="text-2xl font-bold text-white">Verify Your Email</h3>
-                    <p className="text-sm text-gray-400 max-w-sm mx-auto">
-                      We have sent a 6-digit verification code to <span className="text-vibrant-teal font-medium">{email}</span>. Please check your email inbox.
-                    </p>
-                  </div>
-
-                  <form onSubmit={handleVerifyOtp} className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5 text-left">6-Digit Verification Code</label>
-                      <input
-                        type="text"
-                        required
-                        maxLength={6}
-                        placeholder="E.g. 123456"
-                        value={otpInput}
-                        onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ''))}
-                        className="w-full bg-obsidian-950/80 border border-gray-800 rounded-xl py-3 text-center text-xl font-bold tracking-widest text-white focus:outline-none focus:border-vibrant-teal focus:ring-1 focus:ring-vibrant-teal transition-all"
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="w-full bg-gradient-to-r from-vibrant-teal to-blue-500 text-obsidian-950 font-bold py-3 rounded-xl hover:opacity-90 active:scale-[0.98] transition-all text-sm tracking-wider uppercase"
-                    >
-                      {loading ? 'Verifying...' : 'Verify & Sign In'}
-                    </button>
-                  </form>
-
-                  <div className="p-4 bg-obsidian-950/60 border border-gray-800 rounded-xl text-left text-xs text-gray-400 space-y-3">
-                    <p className="font-semibold text-white flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4 text-electric-amber" /> Direct Inbox Delivery
-                    </p>
-                    <p>
-                      To ensure you receive verification messages instantly, the email is routed through our custom mail server straight to your INBOX (never spam).
-                    </p>
-                  </div>
-
-                  {error && (
-                    <div className="flex items-start gap-2 p-2.5 bg-red-950/40 border border-red-500/20 rounded-lg text-red-200 text-xs text-left">
-                      <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
-                      <span>{error}</span>
-                    </div>
-                  )}
-
-                  <div className="flex gap-2 pt-2">
-                    <button
-                      onClick={handleResendVerification}
-                      disabled={loading}
-                      className="flex-1 border border-gray-800 hover:bg-white/5 text-gray-300 font-semibold py-2 px-3 rounded-lg text-xs transition-all"
-                    >
-                      {verificationSent ? 'Code Resent!' : 'Resend Code'}
-                    </button>
-                    <button
-                      onClick={onClose}
-                      className="flex-1 border border-gray-800 hover:bg-white/5 text-gray-300 font-semibold py-2 px-3 rounded-lg text-xs transition-all"
-                    >
-                      Browse First
-                    </button>
-                  </div>
-                </>
               )}
+
+              <div className="flex flex-col gap-2 pt-2">
+                <button
+                  onClick={() => {
+                    setMode('login');
+                    setError(null);
+                  }}
+                  className="w-full bg-gradient-to-r from-vibrant-teal to-blue-500 text-obsidian-950 font-bold py-3 rounded-xl hover:opacity-90 active:scale-[0.98] transition-all text-sm tracking-wider uppercase"
+                >
+                  Go to Login
+                </button>
+                <button
+                  onClick={onClose}
+                  className="w-full border border-gray-800 hover:bg-white/5 text-gray-300 font-semibold py-3 rounded-xl text-sm transition-all"
+                >
+                  Got it, close
+                </button>
+              </div>
             </div>
           )}
         </div>

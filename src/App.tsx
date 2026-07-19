@@ -140,12 +140,18 @@ export default function App() {
               email: user.email || '',
               displayName: user.displayName || user.email?.split('@')[0] || 'User',
               joinedDate,
-              verifiedStatus: false,
+              verifiedStatus: user.emailVerified,
               phone: user.phoneNumber || '',
               listingRefs: []
             };
             console.log('[App] Auto-creating and syncing missing profile to Sheets:', profile);
             await apiSaveUserProfile(profile);
+          } else {
+            // Sync/update verification status if it differs
+            if (profile.verifiedStatus !== user.emailVerified) {
+              profile.verifiedStatus = user.emailVerified;
+              await apiSaveUserProfile(profile);
+            }
           }
           setUserProfile(profile);
         } catch (e: any) {
@@ -160,7 +166,7 @@ export default function App() {
             email: user.email || '',
             displayName: user.displayName || user.email?.split('@')[0] || 'User',
             joinedDate,
-            verifiedStatus: false,
+            verifiedStatus: user.emailVerified,
             phone: user.phoneNumber || '',
             listingRefs: []
           };
