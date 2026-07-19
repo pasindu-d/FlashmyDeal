@@ -19,7 +19,7 @@ import {
   Heart,
   Share2
 } from 'lucide-react';
-import { auth, onAuthStateChanged } from './lib/firebase';
+import { auth, onAuthStateChanged, signOut } from './lib/firebase';
 import { User } from './lib/firebase';
 import { ProductListing, UserProfile, LOCATIONS, CATEGORIES } from './types';
 import { 
@@ -42,6 +42,9 @@ import ListingDetailModal from './components/ListingDetailModal';
 import AuthModal from './components/AuthModal';
 import AdPostingForm from './components/AdPostingForm';
 import ContactUs from './components/ContactUs';
+import MobileBottomNav from './components/MobileBottomNav';
+import MobileFiltersDrawer from './components/MobileFiltersDrawer';
+import MobileAccountDrawer from './components/MobileAccountDrawer';
 
 export default function App() {
   // Global auth state
@@ -99,6 +102,12 @@ export default function App() {
 
   const [onlyFavoritesFilter, setOnlyFavoritesFilter] = useState(false);
 
+  // Mobile drawer states
+  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+  const [isMobileAccountOpen, setIsMobileAccountOpen] = useState(false);
+  const [mobileDeleteError, setMobileDeleteError] = useState<string | null>(null);
+  const [mobileIsDeleting, setMobileIsDeleting] = useState(false);
+
   useEffect(() => {
     localStorage.setItem('flashmydeal_favorites', JSON.stringify(favorites));
   }, [favorites]);
@@ -113,6 +122,111 @@ export default function App() {
       );
       return next;
     });
+  };
+
+  const handleMobileSignOut = async () => {
+    try {
+      await signOut(auth);
+      setIsMobileAccountOpen(false);
+    } catch (e) {
+      console.error('Sign out error:', e);
+    }
+  };
+
+  const handleMobileDeleteAccount = async () => {
+    setMobileIsDeleting(true);
+    setMobileDeleteError(null);
+
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        setMobileDeleteError("No active user session found.");
+        setMobileIsDeleting(false);
+        return;
+      }
+
+      const uid = currentUser.uid;
+      const appsScriptUrl = getAppsScriptUrl();
+      
+      // 1. Send delete request to Google Sheets
+      if (appsScriptUrl) {
+        try {
+          await fetch('/api/proxy', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              url: appsScriptUrl,
+              payload: {
+                action: 'deleteUser',
+                uid
+              }
+            })
+          });
+        } catch (sheetErr) {
+          console.error("Failed to delete user row in Google Sheets:", sheetErr);
+        }
+      }
+
+      // 2. Delete user profile document from Firestore
+      try {
+        const { doc, deleteDoc } = await import('firebase/firestore');
+        const { db } = await import('./lib/firebase');
+        await deleteDoc(doc(db, 'users', uid));
+      } catch (firestoreErr) {
+        console.error("Failed to delete user document from Firestore:", firestoreErr);
+      }
+
+      // 3. Clear from local storage
+      const localUsersStr = localStorage.getItem('flashmydeal_local_users');
+      if (localUsersStr) {
+        try {
+          const usersObj = JSON.parse(localUsersStr);
+          delete usersObj[uid];
+          localStorage.setItem('flashmydeal_local_users', JSON.stringify(usersObj));
+        } catch (lsErr) {
+          console.error('Error clearing local user profile cache:', lsErr);
+        }
+      }
+
+      const localListingsStr = localStorage.getItem('flashmydeal_local_listings');
+      if (localListingsStr) {
+        try {
+          const listings = JSON.parse(localListingsStr);
+          if (Array.isArray(listings)) {
+            const updatedListings = listings.filter((l: any) => l.sellerId !== uid);
+            localStorage.setItem('flashmydeal_local_listings', JSON.stringify(updatedListings));
+          }
+        } catch (lsErr) {
+          console.error('Error clearing local user listings cache:', lsErr);
+        }
+      }
+
+      // 4. Delete from Firebase Authentication
+      try {
+        const { deleteUser } = await import('firebase/auth');
+        await deleteUser(currentUser);
+      } catch (authErr: any) {
+        if (authErr.code === 'auth/requires-recent-login') {
+          setMobileDeleteError("For security reasons, deleting your account requires a recent sign-in. Please log out, sign in again, and retry.");
+          setMobileIsDeleting(false);
+          return;
+        } else {
+          console.error("Firebase auth delete failed:", authErr);
+        }
+      }
+
+      // 5. Sign out of Auth
+      await signOut(auth);
+
+      alert("Your account and all linked details have been permanently deleted.");
+      window.location.href = window.location.origin;
+    } catch (err: any) {
+      console.error("Account deletion failed:", err);
+      setMobileDeleteError("Failed to delete account: " + (err.message || err));
+      setMobileIsDeleting(false);
+    }
   };
 
   const copyToClipboard = (url: string) => {
@@ -442,7 +556,7 @@ export default function App() {
     .slice(0, 4);
 
   return (
-    <div className="min-h-screen bg-obsidian-900 text-gray-200">
+    <div className="min-h-screen bg-obsidian-900 text-gray-200 pb-20 md:pb-0">
       
       {/* Navbar Component */}
       <Navbar 
@@ -475,6 +589,7 @@ export default function App() {
             setSelectedLocation={setSelectedLocation}
             onClearFilters={handleClearFilters}
             hasFilters={hasActiveFilters}
+            onToggleMobileFilters={() => setIsMobileFilterOpen(!isMobileFilterOpen)}
           />
 
       {/* Unverified Email Warning bar if logged in but not verified */}
@@ -535,10 +650,10 @@ export default function App() {
         )}
 
         {/* Catalog Search & Browse Hub */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
           
           {/* Left Side: Sidebar Filters (3 Cols on Desktop) */}
-          <div className="lg:col-span-3 rounded-2xl border border-gray-800 bg-obsidian-950/60 p-6 space-y-6 sticky top-20 backdrop-blur-md">
+          <div className="hidden md:block md:col-span-4 lg:col-span-3 rounded-2xl border border-gray-800 bg-obsidian-950/60 p-6 space-y-6 sticky top-20 backdrop-blur-md">
             
             <div className="flex items-center justify-between border-b border-gray-800 pb-4">
               <span className="font-bold text-white text-sm uppercase tracking-wider flex items-center gap-2">
@@ -666,7 +781,7 @@ export default function App() {
           </div>
 
           {/* Right Side: Catalog Listings (9 Cols on Desktop) */}
-          <div className="lg:col-span-9 space-y-6">
+          <div className="md:col-span-8 lg:col-span-9 space-y-6">
             
             {/* Toolbar row */}
             <div className="flex items-center justify-between border-b border-gray-800 pb-4">
@@ -831,10 +946,10 @@ export default function App() {
       )}
 
       {/* Footer Block */}
-      <footer className="border-t border-gray-900 bg-obsidian-950/60 py-10 mt-20 text-center text-xs text-gray-500 space-y-2">
-        <p className="font-bold text-gray-400">FlashmyDeal Premium Classifieds Catalog</p>
-        <p>Decentralized storage engine utilizing secure Firebase authentication and Google Drive REST API worker.</p>
-        <p className="font-mono text-[10px]">Version 1.0.0 • Root Node Connected</p>
+      <footer className="border-t border-gray-900 bg-obsidian-950/60 py-10 mt-20 text-center text-xs text-gray-500 space-y-1">
+        <p>© 2026</p>
+        <p className="font-bold text-gray-400">FlashmyDeal Premium</p>
+        <p>All rights reserved.</p>
       </footer>
 
       {/* Auth Modal Component */}
@@ -907,6 +1022,60 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Mobile Filters Drawer */}
+      <MobileFiltersDrawer
+        isOpen={isMobileFilterOpen}
+        onClose={() => setIsMobileFilterOpen(false)}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        selectedCategory={selectedCategory}
+        setSelectedCategory={setSelectedCategory}
+        selectedLocation={selectedLocation}
+        setSelectedLocation={setSelectedLocation}
+        conditionFilter={conditionFilter}
+        setConditionFilter={setConditionFilter}
+        minPrice={minPrice}
+        setMinPrice={setMinPrice}
+        maxPrice={maxPrice}
+        setMaxPrice={setMaxPrice}
+        onlyDealsFilter={onlyDealsFilter}
+        setOnlyDealsFilter={setOnlyDealsFilter}
+        onlyFavoritesFilter={onlyFavoritesFilter}
+        setOnlyFavoritesFilter={setOnlyFavoritesFilter}
+        favoritesCount={favorites.length}
+        onClearFilters={handleClearFilters}
+        hasFilters={hasActiveFilters}
+        matchedCount={filteredListings.length}
+      />
+
+      {/* Mobile Account Drawer */}
+      <MobileAccountDrawer
+        isOpen={isMobileAccountOpen}
+        onClose={() => setIsMobileAccountOpen(false)}
+        user={currentUser}
+        userProfile={userProfile}
+        onSignOut={handleMobileSignOut}
+        onDeleteAccount={handleMobileDeleteAccount}
+        isDeleting={mobileIsDeleting}
+        deleteError={mobileDeleteError}
+        setDeleteError={setMobileDeleteError}
+      />
+
+      {/* Mobile Bottom Navigation Bar */}
+      <MobileBottomNav
+        currentView={currentView}
+        setCurrentView={setCurrentView}
+        onOpenPostAd={handlePostAdClick}
+        onToggleFilters={() => setIsMobileFilterOpen(!isMobileFilterOpen)}
+        isFilterActive={hasActiveFilters}
+        user={currentUser}
+        onOpenAuth={(mode) => {
+          setAuthInitialMode(mode);
+          setAuthModalOpen(true);
+        }}
+        onToggleAccountSheet={() => setIsMobileAccountOpen(!isMobileAccountOpen)}
+      />
 
     </div>
   );

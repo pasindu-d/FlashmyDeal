@@ -378,7 +378,7 @@ export default function Navbar({ user, userProfile, onOpenAuth, onOpenPostAd, on
             {/* Post Ad Button */}
             <button
               onClick={onOpenPostAd}
-              className="flex items-center gap-1 px-4 py-2 rounded-xl text-xs font-extrabold bg-gradient-to-r from-electric-amber to-orange-500 text-obsidian-950 hover:opacity-90 active:scale-95 shadow-[0_0_15px_rgba(255,159,10,0.25)] transition-all uppercase tracking-wider"
+              className="hidden md:flex items-center gap-1 px-4 py-2 rounded-xl text-xs font-extrabold bg-gradient-to-r from-electric-amber to-orange-500 text-obsidian-950 hover:opacity-90 active:scale-95 shadow-[0_0_15px_rgba(255,159,10,0.25)] transition-all uppercase tracking-wider"
             >
               <Zap className="w-3.5 h-3.5 fill-current" />
               Sell your Item

@@ -11,6 +11,7 @@ interface HeroProps {
   setSelectedLocation: (loc: string) => void;
   onClearFilters: () => void;
   hasFilters: boolean;
+  onToggleMobileFilters?: () => void;
 }
 
 export default function Hero({
@@ -21,7 +22,8 @@ export default function Hero({
   selectedLocation,
   setSelectedLocation,
   onClearFilters,
-  hasFilters
+  hasFilters,
+  onToggleMobileFilters
 }: HeroProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -73,7 +75,7 @@ export default function Hero({
         </div>
 
         {/* Semantic Search Panel */}
-        <div className="mx-auto max-w-3xl rounded-2xl border border-gray-800 bg-obsidian-900/50 p-2 sm:p-3 backdrop-blur-lg shadow-2xl glow-teal">
+        <div className="hidden md:block mx-auto max-w-3xl rounded-2xl border border-gray-800 bg-obsidian-900/50 p-2 sm:p-3 backdrop-blur-lg shadow-2xl glow-teal">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-2 sm:gap-3">
             
             {/* Search input (4/12) */}
@@ -137,6 +139,25 @@ export default function Hero({
 
           </div>
         </div>
+
+        {/* Compact Mobile Search Card */}
+        {onToggleMobileFilters && (
+          <div className="md:hidden mx-auto max-w-md px-2">
+            <button
+              onClick={onToggleMobileFilters}
+              className="w-full flex items-center justify-between px-4 py-3 bg-obsidian-900 border border-gray-850 rounded-xl text-xs text-gray-400 hover:text-white hover:border-vibrant-teal/30 active:scale-[0.99] transition-all cursor-pointer shadow-lg shadow-black/40"
+              id="hero-mobile-search-trigger"
+            >
+              <span className="flex items-center gap-2">
+                <Search className="w-4 h-4 text-vibrant-teal" />
+                {searchQuery ? `Search: "${searchQuery}"` : "Search, categories, districts..."}
+              </span>
+              <span className="flex items-center gap-1.5 text-vibrant-teal font-extrabold uppercase tracking-wider text-[10px] bg-vibrant-teal/10 px-2.5 py-1 rounded-md border border-vibrant-teal/20">
+                <Filter className="w-3 h-3" /> Filter
+              </span>
+            </button>
+          </div>
+        )}
 
         {/* Clear Filters bar */}
         {hasFilters && (
