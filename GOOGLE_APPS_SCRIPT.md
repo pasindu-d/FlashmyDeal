@@ -371,8 +371,10 @@ function createListingInDriveAndSheet(sheet, payload) {
 
 function updateListingStatus(sheet, listingId, status) {
   var data = sheet.getDataRange().getValues();
+  var searchId = String(listingId).trim();
   for (var i = 1; i < data.length; i++) {
-    if (data[i][0] === listingId) {
+    var cellValue = String(data[i][0]).trim();
+    if (cellValue === searchId) {
       sheet.getRange(i + 1, 14).setValue(status); // Status is in 14th column (1-indexed)
       return true;
     }
@@ -382,8 +384,10 @@ function updateListingStatus(sheet, listingId, status) {
 
 function deleteListingRow(sheet, listingId) {
   var data = sheet.getDataRange().getValues();
+  var searchId = String(listingId).trim();
   for (var i = 1; i < data.length; i++) {
-    if (data[i][0] === listingId) {
+    var cellValue = String(data[i][0]).trim();
+    if (cellValue === searchId) {
       sheet.deleteRow(i + 1);
       return true;
     }

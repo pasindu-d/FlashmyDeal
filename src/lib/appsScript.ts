@@ -359,7 +359,7 @@ export async function apiUpdateListingStatus(id: string, status: 'active' | 'sol
   if (!url) return true;
 
   try {
-    await fetch('/api/proxy', {
+    const response = await fetch('/api/proxy', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -373,10 +373,26 @@ export async function apiUpdateListingStatus(id: string, status: 'active' | 'sol
         }
       })
     });
-    return true;
-  } catch (err) {
+
+    if (!response.ok) {
+      let errMsg = `HTTP Error ${response.status}`;
+      try {
+        const errJson = await response.json();
+        if (errJson && errJson.error) {
+          errMsg = errJson.error;
+        }
+      } catch (e) {}
+      throw new Error(errMsg);
+    }
+
+    const result = await response.json();
+    if (result && result.error) {
+      throw new Error(result.error);
+    }
+    return !!(result && result.success);
+  } catch (err: any) {
     console.error('[AppsScript Client] Updating status in Apps Script failed:', err);
-    return false;
+    throw new Error(err.message || err);
   }
 }
 
@@ -393,7 +409,7 @@ export async function apiDeleteListing(id: string): Promise<boolean> {
   if (!url) return true;
 
   try {
-    await fetch('/api/proxy', {
+    const response = await fetch('/api/proxy', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -406,9 +422,25 @@ export async function apiDeleteListing(id: string): Promise<boolean> {
         }
       })
     });
-    return true;
-  } catch (err) {
+
+    if (!response.ok) {
+      let errMsg = `HTTP Error ${response.status}`;
+      try {
+        const errJson = await response.json();
+        if (errJson && errJson.error) {
+          errMsg = errJson.error;
+        }
+      } catch (e) {}
+      throw new Error(errMsg);
+    }
+
+    const result = await response.json();
+    if (result && result.error) {
+      throw new Error(result.error);
+    }
+    return !!(result && result.success);
+  } catch (err: any) {
     console.error('[AppsScript Client] Deleting listing in Apps Script failed:', err);
-    return false;
+    throw new Error(err.message || err);
   }
 }

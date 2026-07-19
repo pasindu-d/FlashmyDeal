@@ -362,8 +362,6 @@ export default function App() {
           setAuthModalOpen(true);
         }} 
         onOpenPostAd={handlePostAdClick}
-        storageStatus={storageStatus}
-        onAppsScriptUrlChange={fetchListings}
       />
 
       {/* Hero Header with Search Panel */}
