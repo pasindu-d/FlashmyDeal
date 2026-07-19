@@ -132,7 +132,15 @@ function getLocalUserProfile(uid: string): UserProfile | null {
   if (!localUsers) return null;
   try {
     const users: Record<string, UserProfile> = JSON.parse(localUsers);
-    return users[uid] || null;
+    const profile = users[uid] || null;
+    if (profile && typeof profile === 'object') {
+      if (typeof profile.verifiedStatus === 'string') {
+        profile.verifiedStatus = (profile.verifiedStatus as string).toLowerCase() === 'true';
+      } else {
+        profile.verifiedStatus = !!profile.verifiedStatus;
+      }
+    }
+    return profile;
   } catch {
     return null;
   }
@@ -240,6 +248,15 @@ export async function apiGetUserProfile(uid: string): Promise<UserProfile | null
         });
       }
       return localProfile;
+    }
+    
+    // Normalize verifiedStatus to boolean
+    if (data && typeof data === 'object') {
+      if (typeof data.verifiedStatus === 'string') {
+        data.verifiedStatus = data.verifiedStatus.toLowerCase() === 'true';
+      } else {
+        data.verifiedStatus = !!data.verifiedStatus;
+      }
     }
     return data;
   } catch (err) {

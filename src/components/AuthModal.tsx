@@ -194,11 +194,28 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
         // Mark verified in Sheets
         const currentUser = auth.currentUser;
         if (currentUser) {
-          const profile = await apiGetUserProfile(currentUser.uid);
-          if (profile) {
+          let profile = await apiGetUserProfile(currentUser.uid);
+          if (!profile) {
+            const joinedDate = new Date().toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+            });
+            profile = {
+              uid: currentUser.uid,
+              email: currentUser.email || email,
+              displayName: currentUser.displayName || fullName || 'Seller',
+              joinedDate,
+              verifiedStatus: true,
+              phone: phone || '',
+              listingRefs: [],
+              password: password || '',
+              otpCode: generatedOtp
+            };
+          } else {
             profile.verifiedStatus = true;
-            await apiSaveUserProfile(profile);
           }
+          await apiSaveUserProfile(profile);
         }
 
         // Auto refresh page on successful verification
