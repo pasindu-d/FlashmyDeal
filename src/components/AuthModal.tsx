@@ -177,7 +177,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
       if (err.code === 'auth/invalid-credential' || (err.message && err.message.includes('auth/invalid-credential'))) {
         errMsg = 'Invalid email or password.';
       } else if (err.code === 'auth/email-already-in-use' || (err.message && err.message.includes('auth/email-already-in-use'))) {
-        errMsg = 'This email is already registered. If you were in the middle of signing up, please switch to "Log In" with this email and password, then click "Verify instantly (Sandbox Bypass)".';
+        errMsg = 'This email is already registered. If you were in the middle of signing up, please switch to "Log In" with this email and password, then click "Verify Instantly (Verify Email Later)".';
       } else if (err.code === 'auth/weak-password' || (err.message && err.message.includes('auth/weak-password'))) {
         errMsg = 'Password should be at least 6 characters.';
       } else if (err.code === 'auth/invalid-email' || (err.message && err.message.includes('auth/invalid-email'))) {
@@ -364,9 +364,9 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
                   Please verify your email address by clicking the link in the mail sent to:<br />
                   <span className="text-vibrant-teal font-medium block mt-1.5 break-all select-all">{email}</span>
                 </p>
-                <p className="text-xs text-gray-500 max-w-sm mx-auto leading-relaxed">
-                  If you do not see the email, please check your <strong>Inbox</strong> or <strong>Spam folder</strong>. Thank you!
-                </p>
+                <div className="p-3 bg-amber-500/15 border border-amber-500/30 rounded-xl text-amber-200 text-xs font-semibold max-w-sm mx-auto leading-relaxed shadow-md shadow-black/40 animate-pulse">
+                  ⚠️ <strong>CRITICAL:</strong> Please check your <span className="underline text-amber-300">Inbox</span> or <span className="underline text-amber-300">Spam folder</span> for our verification mail to activate your account features!
+                </div>
               </div>
 
               <div className="p-4 bg-obsidian-950/60 border border-gray-800 rounded-xl text-left text-xs text-gray-400">
@@ -427,7 +427,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
                   disabled={loading}
                   className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition-all text-sm tracking-wider uppercase flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
-                  {loading ? 'Processing...' : 'Verify instantly (Sandbox Bypass)'}
+                  {loading ? 'Processing...' : 'Verify Instantly (Verify Email Later)'}
                 </button>
                 <button
                   onClick={() => {

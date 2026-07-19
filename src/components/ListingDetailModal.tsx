@@ -172,16 +172,22 @@ export default function ListingDetailModal({
                 </div>
               )}
 
-              {/* Mock Map Placeholder */}
+              {/* Real Google Map Integration */}
               <div className="rounded-xl border border-gray-800/80 bg-obsidian-950/60 p-4 space-y-2">
                 <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block">Item Location Map</span>
-                <div className="relative h-28 rounded-lg bg-obsidian-900 border border-gray-800 overflow-hidden flex items-center justify-center bg-[radial-gradient(#1f2937_1px,transparent_1px)] [background-size:16px_16px]">
-                  <div className="absolute text-center space-y-1">
-                    <MapPin className="w-6 h-6 text-vibrant-teal mx-auto animate-bounce" />
-                    <span className="text-xs font-semibold text-white">{listing.location}, Sri Lanka</span>
+                <div className="relative h-36 rounded-lg bg-obsidian-900 border border-gray-800 overflow-hidden">
+                  <iframe
+                    title={`Google Map showing ${listing.location}`}
+                    src={`https://maps.google.com/maps?q=${encodeURIComponent(listing.location + ', Sri Lanka')}&t=&z=12&ie=UTF8&iwloc=&output=embed`}
+                    className="w-full h-full border-0 opacity-80"
+                    style={{ filter: 'invert(90%) hue-rotate(180deg) contrast(120%)' }}
+                    allowFullScreen={false}
+                    loading="lazy"
+                  />
+                  <div className="absolute bottom-2 left-2 bg-obsidian-950/95 border border-gray-800 px-2.5 py-1 rounded-md text-[10px] font-bold text-vibrant-teal flex items-center gap-1 shadow-lg backdrop-blur-sm pointer-events-none">
+                    <MapPin className="w-3.5 h-3.5 animate-pulse" />
+                    <span>{listing.location}, SL</span>
                   </div>
-                  {/* Styled grids simulating coordinates */}
-                  <span className="absolute bottom-2 right-3 font-mono text-[9px] text-gray-600">6.9271° N, 79.8612° E</span>
                 </div>
               </div>
             </div>
