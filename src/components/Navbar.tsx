@@ -162,12 +162,10 @@ export default function Navbar({ user, userProfile, onOpenAuth, onOpenPostAd }: 
                       {userProfile?.phone && (
                         <p className="text-[10px] text-gray-500 mt-0.5">📞 {userProfile.phone}</p>
                       )}
-                      {isVerified && (
-                        <GiftCountdown 
-                          verifiedDate={userProfile?.verifiedDate} 
-                          joinedDate={userProfile?.joinedDate} 
-                        />
-                      )}
+                      <GiftCountdown 
+                        verifiedDate={userProfile?.verifiedDate} 
+                        joinedDate={userProfile?.joinedDate} 
+                      />
                     </div>
 
                     {/* Options list */}
