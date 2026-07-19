@@ -8,6 +8,7 @@ export interface UserProfile {
   listingRefs: string[];
   password?: string;
   otpCode?: string;
+  verifiedDate?: string;
 }
 
 export interface ProductListing {

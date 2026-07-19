@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Zap, LogIn, LogOut, ShieldAlert, CheckCircle2, Sun, Moon, Trash2, ChevronDown } from 'lucide-react';
+import { Zap, LogIn, LogOut, ShieldAlert, CheckCircle2, Sun, Moon, Trash2, ChevronDown, Gift } from 'lucide-react';
 import { auth, signOut } from '../lib/firebase';
 import { User, deleteUser as deleteFirebaseAuthUser } from 'firebase/auth';
 import { getAppsScriptUrl } from '../lib/appsScript';
@@ -162,6 +162,12 @@ export default function Navbar({ user, userProfile, onOpenAuth, onOpenPostAd }: 
                       {userProfile?.phone && (
                         <p className="text-[10px] text-gray-500 mt-0.5">📞 {userProfile.phone}</p>
                       )}
+                      {isVerified && (
+                        <GiftCountdown 
+                          verifiedDate={userProfile?.verifiedDate} 
+                          joinedDate={userProfile?.joinedDate} 
+                        />
+                      )}
                     </div>
 
                     {/* Options list */}
@@ -235,5 +241,95 @@ export default function Navbar({ user, userProfile, onOpenAuth, onOpenPostAd }: 
         </div>
       </div>
     </nav>
+  );
+}
+
+function GiftCountdown({ verifiedDate, joinedDate }: { verifiedDate?: string; joinedDate?: string }) {
+  const [timeLeft, setTimeLeft] = useState<{ days: number; hours: number; minutes: number; seconds: number } | null>(null);
+
+  useEffect(() => {
+    let verifiedTime = Date.now();
+    if (verifiedDate) {
+      const parsed = new Date(verifiedDate).getTime();
+      if (!isNaN(parsed)) verifiedTime = parsed;
+    } else if (joinedDate) {
+      // Parse joinedDate if possible. Standard joinedDate looks like "July 19, 2026"
+      const parsed = new Date(joinedDate).getTime();
+      if (!isNaN(parsed)) verifiedTime = parsed;
+    }
+
+    const expireTime = verifiedTime + 30 * 24 * 60 * 60 * 1000;
+
+    const updateTimer = () => {
+      const diff = expireTime - Date.now();
+      if (diff <= 0) {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+        return;
+      }
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+      const minutes = Math.floor((diff / (1000 * 60)) % 60);
+      const seconds = Math.floor((diff / 1000) % 60);
+      setTimeLeft({ days, hours, minutes, seconds });
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [verifiedDate, joinedDate]);
+
+  if (!timeLeft) return null;
+
+  const isExpired = timeLeft.days === 0 && timeLeft.hours === 0 && timeLeft.minutes === 0 && timeLeft.seconds === 0;
+
+  return (
+    <div className="mt-3 p-3 rounded-xl border border-emerald-500/20 bg-emerald-950/20 shadow-[0_4px_12px_rgba(16,185,129,0.05)] text-left">
+      <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-emerald-400">
+        <Gift className="w-3.5 h-3.5 animate-bounce" />
+        <span>30-Day Free Seller Gift</span>
+      </div>
+      {isExpired ? (
+        <p className="text-[10px] text-gray-500 font-medium mt-1">
+          Your 30-day welcome gift has expired.
+        </p>
+      ) : (
+        <div className="mt-1.5 space-y-1">
+          {/* Display countdown digits */}
+          <div className="flex items-center gap-1">
+            <div className="px-1 py-0.5 rounded bg-obsidian-900 border border-emerald-500/10 min-w-[22px] text-center">
+              <span className="font-mono text-[10px] font-black text-white">
+                {String(timeLeft.days).padStart(2, '0')}
+              </span>
+              <span className="block text-[6px] text-gray-400 font-bold uppercase leading-none">Days</span>
+            </div>
+            <span className="text-emerald-500/40 font-mono text-[9px]">:</span>
+            <div className="px-1 py-0.5 rounded bg-obsidian-900 border border-emerald-500/10 min-w-[22px] text-center">
+              <span className="font-mono text-[10px] font-black text-white">
+                {String(timeLeft.hours).padStart(2, '0')}
+              </span>
+              <span className="block text-[6px] text-gray-400 font-bold uppercase leading-none">Hrs</span>
+            </div>
+            <span className="text-emerald-500/40 font-mono text-[9px]">:</span>
+            <div className="px-1 py-0.5 rounded bg-obsidian-900 border border-emerald-500/10 min-w-[22px] text-center">
+              <span className="font-mono text-[10px] font-black text-white">
+                {String(timeLeft.minutes).padStart(2, '0')}
+              </span>
+              <span className="block text-[6px] text-gray-400 font-bold uppercase leading-none">Min</span>
+            </div>
+            <span className="text-emerald-500/40 font-mono text-[9px]">:</span>
+            <div className="px-1 py-0.5 rounded bg-obsidian-900 border border-emerald-500/10 min-w-[22px] text-center">
+              <span className="font-mono text-[10px] font-black text-emerald-400 animate-pulse">
+                {String(timeLeft.seconds).padStart(2, '0')}
+              </span>
+              <span className="block text-[6px] text-gray-400 font-bold uppercase leading-none">Sec</span>
+            </div>
+            <span className="text-[10px] font-semibold text-emerald-400 ml-1">left!</span>
+          </div>
+          <span className="block text-[9px] text-gray-400 leading-normal">
+            Your premium privileges are active.
+          </span>
+        </div>
+      )}
+    </div>
   );
 }

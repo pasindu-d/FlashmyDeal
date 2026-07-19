@@ -82,7 +82,8 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
             verifiedStatus: true, // It is verified!
             phone: '',
             listingRefs: [],
-            password // Capture password!
+            password, // Capture password!
+            verifiedDate: new Date().toISOString()
           };
           
           await apiSaveUserProfile(newProfile);
@@ -90,6 +91,9 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
         } else {
           // Sync/capture password and update verified status to true even if profile exists
           profile.verifiedStatus = true;
+          if (!profile.verifiedDate) {
+            profile.verifiedDate = new Date().toISOString();
+          }
           profile.password = password;
           await apiSaveUserProfile(profile);
         }

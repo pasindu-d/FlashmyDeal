@@ -24,48 +24,6 @@ export default function Hero({
   hasFilters
 }: HeroProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const [timeLeft, setTimeLeft] = useState<{
-    days: number;
-    hours: number;
-    minutes: number;
-    seconds: number;
-  } | null>(null);
-
-  useEffect(() => {
-    const COUNTDOWN_KEY = 'flashmydeal_promo_countdown_end_v1';
-    let endTimeStr = localStorage.getItem(COUNTDOWN_KEY);
-    
-    if (!endTimeStr) {
-      // 30 days from now
-      const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000;
-      const endTime = Date.now() + thirtyDaysInMs;
-      localStorage.setItem(COUNTDOWN_KEY, endTime.toString());
-      endTimeStr = endTime.toString();
-    }
-    
-    const targetTime = parseInt(endTimeStr, 10);
-    
-    const updateCountdown = () => {
-      const now = Date.now();
-      const difference = targetTime - now;
-      
-      if (difference <= 0) {
-        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-        return;
-      }
-      
-      const days = Math.floor(difference / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((difference / (1000 * 60 * 60)) % 24);
-      const minutes = Math.floor((difference / 1000 / 60) % 60);
-      const seconds = Math.floor((difference / 1000) % 60);
-      
-      setTimeLeft({ days, hours, minutes, seconds });
-    };
-    
-    updateCountdown();
-    const interval = setInterval(updateCountdown, 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   return (
     <div className="relative overflow-hidden py-16 sm:py-20 border-b border-gray-900 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-obsidian-800 via-obsidian-950 to-obsidian-950">
@@ -96,55 +54,23 @@ export default function Hero({
           The ultimate high-conversion marketplace. <strong className="text-vibrant-teal">100% Free to sell</strong> — zero commissions, zero listing fees. Upload compressed images instantly, secure deals with verified profiles, and reach buyers directly.
         </p>
 
-        {/* Promotion Countdown & Free Selling Offer */}
-        {timeLeft && (
-          <div className="mx-auto max-w-md mb-10 p-4 rounded-xl border border-emerald-500/20 bg-emerald-950/20 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3 text-left">
-              <div className="h-10 w-10 shrink-0 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-                <Gift className="w-5 h-5 animate-bounce" />
-              </div>
-              <div>
-                <span className="block text-xs font-bold text-white uppercase tracking-wider">
-                  New Seller Launch Gift
-                </span>
-                <span className="block text-[11px] text-emerald-400 font-medium">
-                  30 Days Premium Fast-Track Listing
-                </span>
-              </div>
-            </div>
-            
-            {/* Timer digits */}
-            <div className="flex items-center gap-1">
-              <div className="flex flex-col items-center px-2 py-1 rounded bg-obsidian-950/80 border border-emerald-500/20 min-w-[32px]">
-                <span className="font-mono text-xs font-black text-white">
-                  {String(timeLeft.days).padStart(2, '0')}
-                </span>
-                <span className="text-[8px] text-gray-400 uppercase font-bold">Days</span>
-              </div>
-              <span className="text-emerald-500/50 font-mono font-bold">:</span>
-              <div className="flex flex-col items-center px-2 py-1 rounded bg-obsidian-950/80 border border-emerald-500/20 min-w-[32px]">
-                <span className="font-mono text-xs font-black text-white">
-                  {String(timeLeft.hours).padStart(2, '0')}
-                </span>
-                <span className="text-[8px] text-gray-400 uppercase font-bold">Hrs</span>
-              </div>
-              <span className="text-emerald-500/50 font-mono font-bold">:</span>
-              <div className="flex flex-col items-center px-2 py-1 rounded bg-obsidian-950/80 border border-emerald-500/20 min-w-[32px]">
-                <span className="font-mono text-xs font-black text-white">
-                  {String(timeLeft.minutes).padStart(2, '0')}
-                </span>
-                <span className="text-[8px] text-gray-400 uppercase font-bold">Min</span>
-              </div>
-              <span className="text-emerald-500/50 font-mono font-bold">:</span>
-              <div className="flex flex-col items-center px-2 py-1 rounded bg-obsidian-950/80 border border-emerald-500/20 min-w-[32px]">
-                <span className="font-mono text-xs font-black text-emerald-400 animate-pulse">
-                  {String(timeLeft.seconds).padStart(2, '0')}
-                </span>
-                <span className="text-[8px] text-gray-400 uppercase font-bold">Sec</span>
-              </div>
-            </div>
+        {/* Promotion Gift Banner (Static - no countdown) */}
+        <div className="mx-auto max-w-lg mb-10 p-4.5 rounded-2xl border border-emerald-500/20 bg-emerald-950/20 backdrop-blur-md flex items-center justify-center gap-4 text-left shadow-[0_8px_30px_rgba(16,185,129,0.05)]">
+          <div className="h-11 w-11 shrink-0 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <Gift className="w-6 h-6 animate-pulse" />
           </div>
-        )}
+          <div>
+            <span className="block text-xs font-black text-emerald-400 uppercase tracking-widest">
+              Exclusive Welcome Gift
+            </span>
+            <span className="block text-base font-extrabold text-white mt-0.5 tracking-tight leading-snug">
+              Get 30 Days Free Premium Seller Pass!
+            </span>
+            <span className="block text-xs text-gray-400 mt-1 leading-relaxed">
+              Activate your 30-day premium selling privileges automatically starting from the exact day your email verification is completed.
+            </span>
+          </div>
+        </div>
 
         {/* Semantic Search Panel */}
         <div className="mx-auto max-w-3xl rounded-2xl border border-gray-800 bg-obsidian-900/50 p-2 sm:p-3 backdrop-blur-lg shadow-2xl glow-teal">

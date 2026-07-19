@@ -142,14 +142,23 @@ export default function App() {
               joinedDate,
               verifiedStatus: user.emailVerified,
               phone: user.phoneNumber || '',
-              listingRefs: []
+              listingRefs: [],
+              verifiedDate: user.emailVerified ? new Date().toISOString() : undefined
             };
             console.log('[App] Auto-creating and syncing missing profile to Sheets:', profile);
             await apiSaveUserProfile(profile);
           } else {
             // Sync/update verification status if it differs
+            let updated = false;
             if (profile.verifiedStatus !== user.emailVerified) {
               profile.verifiedStatus = user.emailVerified;
+              updated = true;
+            }
+            if (profile.verifiedStatus && !profile.verifiedDate) {
+              profile.verifiedDate = new Date().toISOString();
+              updated = true;
+            }
+            if (updated) {
               await apiSaveUserProfile(profile);
             }
           }
@@ -168,7 +177,8 @@ export default function App() {
             joinedDate,
             verifiedStatus: user.emailVerified,
             phone: user.phoneNumber || '',
-            listingRefs: []
+            listingRefs: [],
+            verifiedDate: user.emailVerified ? new Date().toISOString() : undefined
           };
           setUserProfile(fallbackProfile);
           apiSaveUserProfile(fallbackProfile).catch((err) => {
