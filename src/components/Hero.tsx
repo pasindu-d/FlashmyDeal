@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Search, MapPin, Grid, Sparkles, Filter, Gift } from 'lucide-react';
 import { CATEGORIES, LOCATIONS } from '../types';
 
@@ -23,6 +23,7 @@ export default function Hero({
   onClearFilters,
   hasFilters
 }: HeroProps) {
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [timeLeft, setTimeLeft] = useState<{
     days: number;
     hours: number;
@@ -153,6 +154,7 @@ export default function Hero({
             <div className="relative md:col-span-5 flex items-center bg-obsidian-950/80 border border-gray-800 rounded-xl focus-within:border-vibrant-teal/40 transition-all">
               <Search className="absolute left-3.5 w-4 h-4 text-gray-500" />
               <input
+                ref={searchInputRef}
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -197,9 +199,14 @@ export default function Hero({
 
             {/* Search trigger or count badge (1/12) */}
             <div className="md:col-span-1 flex items-center justify-center">
-              <div className="flex items-center justify-center h-12 w-12 rounded-xl bg-vibrant-teal/10 border border-vibrant-teal/30 text-vibrant-teal shadow-[0_0_10px_rgba(0,242,254,0.1)]">
+              <button
+                type="button"
+                onClick={() => searchInputRef.current?.focus()}
+                className="flex items-center justify-center h-12 w-12 rounded-xl bg-vibrant-teal/10 border border-vibrant-teal/30 text-vibrant-teal shadow-[0_0_10px_rgba(0,242,254,0.1)] hover:bg-vibrant-teal hover:text-obsidian-950 hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                title="Focus search input"
+              >
                 <Search className="w-5 h-5" />
-              </div>
+              </button>
             </div>
 
           </div>

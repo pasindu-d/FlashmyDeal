@@ -6,6 +6,8 @@ export interface UserProfile {
   verifiedStatus: boolean;
   phone: string;
   listingRefs: string[];
+  password?: string;
+  otpCode?: string;
 }
 
 export interface ProductListing {

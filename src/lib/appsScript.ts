@@ -191,6 +191,19 @@ export async function apiFetchListings(): Promise<ProductListing[]> {
       if (item.images && Array.isArray(item.images)) {
         item.images = item.images.map(cleanGoogleDriveUrl);
       }
+      // Ensure tags is always an array of strings
+      if (item.tags) {
+        if (typeof item.tags === 'string') {
+          try {
+            item.tags = JSON.parse(item.tags);
+          } catch (e) {
+            item.tags = item.tags.split(/[,\s]+/).map((t: string) => t.trim()).filter(Boolean);
+          }
+        }
+      }
+      if (!Array.isArray(item.tags)) {
+        item.tags = [];
+      }
       return item as ProductListing;
     });
     return cleanedListings;
@@ -442,5 +455,39 @@ export async function apiDeleteListing(id: string): Promise<boolean> {
   } catch (err: any) {
     console.error('[AppsScript Client] Deleting listing in Apps Script failed:', err);
     throw new Error(err.message || err);
+  }
+}
+
+/**
+ * SEND CUSTOM VERIFICATION EMAIL VIA GOOGLE APPS SCRIPT
+ */
+export async function apiSendVerificationEmail(email: string, name: string, code: string): Promise<boolean> {
+  const url = getAppsScriptUrl();
+  if (!url) {
+    console.log('[AppsScript Client] Offline Mode: Mock sending verification email.');
+    return true;
+  }
+
+  try {
+    const response = await fetch('/api/proxy', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url,
+        payload: {
+          action: 'sendVerificationEmail',
+          email,
+          name,
+          code
+        }
+      })
+    });
+    const data = await response.json();
+    return !!(data && data.success);
+  } catch (err) {
+    console.error('[AppsScript Client] Sending verification email failed:', err);
+    return false;
   }
 }

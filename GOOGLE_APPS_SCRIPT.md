@@ -1,6 +1,6 @@
 # FlashmyDeal Google Apps Script Serverless Backend
 
-Use this guide to deploy your own **100% free, serverless API** that connects FlashmyDeal directly to your Google Sheets (acting as your database) and Google Drive (for image hosting).
+Use this guide to deploy your own **100% free, serverless API** that connects FlashmyDeal directly to your Google Sheets (acting as your database) and Google Drive (for image hosting and custom verification emails).
 
 This guide and script has been pre-configured with **your custom Google Drive parent folder** and is ready to attach directly to your spreadsheet!
 
@@ -9,9 +9,9 @@ This guide and script has been pre-configured with **your custom Google Drive pa
 ## 🚀 Deployment Instructions (Step-by-Step)
 
 ### Step 1: Open Your Existing Google Sheet
-- Open your provided database spreadsheet:
+- Open your database spreadsheet:
   👉 [FlashmyDeal Database Sheet](https://docs.google.com/spreadsheets/d/1lEw-w4nTWlRptyXJkPOHBW3O_n8oBgtGkf6zTQOMnIk/edit?usp=sharing)
-- *Note: You don't need to manually create any tables/columns. The script will automatically initialize the `listings` and `users` sheets with proper column headers on its very first run.*
+- *Note: The updated script will automatically handle the new `password` and `otpCode` columns inside the `users` tab.*
 
 ### Step 2: Attach the Apps Script
 1. Inside your Google Sheet, click on the **Extensions** menu at the top.
@@ -32,9 +32,10 @@ This guide and script has been pre-configured with **your custom Google Drive pa
 6. Google will prompt you to authorize permissions. Click **Authorize access**, log in with your Google account, click **Advanced** at the bottom, select **Go to Untitled project (unsafe)**, and hit **Allow**.
 7. Once deployed, copy the **Web App URL** from the success screen (it ends with `/exec`).
 
-### Step 4: Configure the Website
-- Paste your copied Web App URL directly in the **Google Sheets Connection** panel at the top-right of your FlashmyDeal website!
-- Click **Connect** and you're good to go!
+### Step 4: No Configuration Needed on Frontend
+- The website is preconfigured to use your custom Web App URL:
+  `https://script.google.com/macros/s/AKfycbwa8W5RrBnTWRkNEbl3thkO_KsmXKi1OMbWcsaNb1glVe2w8TSV-k63l_1u5Ce9UK5GtA/exec`
+- No further work is needed on your end!
 
 ---
 
@@ -96,6 +97,54 @@ function doPost(e) {
       return jsonResponse({ success: success });
     }
     
+    if (action === 'deleteUser') {
+      var success = deleteUserRow(sheets.usersSheet, postData.uid);
+      return jsonResponse({ success: success });
+    }
+    
+    if (action === 'sendVerificationEmail') {
+      var email = postData.email;
+      var name = postData.name;
+      var code = postData.code;
+      
+      var subject = "Verify your FlashmyDeal Seller Account";
+      var body = "Hi " + name + ",\n\n" +
+                 "Your FlashmyDeal verification code is: " + code + "\n\n" +
+                 "Please enter this code in the website verification box to verify your account and start posting deals.\n\n" +
+                 "Best regards,\nFlashmyDeal Team";
+                 
+      var htmlBody = "<div style='font-family: Arial, sans-serif; max-width: 500px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 12px; background-color: #060911; color: #ffffff;'>" +
+                     "<h2 style='color: #00f2fe; text-align: center; margin-bottom: 24px;'>FlashmyDeal Verification</h2>" +
+                     "<p style='font-size: 14px; color: #94a3b8; line-height: 1.5;'>Hi <strong>" + name + "</strong>,</p>" +
+                     "<p style='font-size: 14px; color: #94a3b8; line-height: 1.5;'>Thank you for joining Sri Lanka's premium flash marketplace! To secure your account and start posting lightning-fast deals, please verify your email using the verification code below:</p>" +
+                     "<div style='text-align: center; margin: 30px 0;'>" +
+                     "<span style='font-size: 32px; font-weight: 800; letter-spacing: 5px; color: #ffffff; background-color: #111827; padding: 12px 24px; border-radius: 8px; border: 1px solid #00f2fe; display: inline-block;'>" + code + "</span>" +
+                     "</div>" +
+                     "<p style='font-size: 12px; color: #64748b; line-height: 1.5;'>If you did not request this verification, please ignore this email.</p>" +
+                     "<hr style='border: 0; border-top: 1px solid #111827; margin: 24px 0;'>" +
+                     "<p style='font-size: 11px; text-align: center; color: #475569;'>Sent securely from your FlashmyDeal personal portal</p>" +
+                     "</div>";
+
+      try {
+        GmailApp.sendEmail(email, subject, body, {
+          name: "FlashmyDeal Marketplace",
+          htmlBody: htmlBody
+        });
+        return jsonResponse({ success: true });
+      } catch (e) {
+        // Fallback to MailApp
+        try {
+          MailApp.sendEmail(email, subject, body, {
+            name: "FlashmyDeal Marketplace",
+            htmlBody: htmlBody
+          });
+          return jsonResponse({ success: true });
+        } catch (mailErr) {
+          return jsonResponse({ error: "Failed to send verification email: " + mailErr.toString() });
+        }
+      }
+    }
+    
     return jsonResponse({ error: 'Invalid action: ' + action });
   } catch (err) {
     return jsonResponse({ error: err.toString() });
@@ -127,8 +176,19 @@ function initSheets() {
   if (!usersSheet) {
     usersSheet = doc.insertSheet("users");
     usersSheet.appendRow([
-      "uid", "email", "displayName", "joinedDate", "verifiedStatus", "phone", "listingRefs"
+      "uid", "email", "displayName", "joinedDate", "verifiedStatus", "phone", "listingRefs", "password", "otpCode"
     ]);
+  } else {
+    // Add missing password and otpCode headers to existing sheets dynamically
+    var data = usersSheet.getDataRange().getValues();
+    var headers = data[0] || [];
+    if (headers.indexOf("password") === -1) {
+      usersSheet.getRange(1, headers.length + 1).setValue("password");
+    }
+    headers = usersSheet.getDataRange().getValues()[0];
+    if (headers.indexOf("otpCode") === -1) {
+      usersSheet.getRange(1, headers.length + 1).setValue("otpCode");
+    }
   }
   
   return { listingsSheet: listingsSheet, usersSheet: usersSheet };
@@ -143,8 +203,10 @@ function getUserByUid(sheet, uid) {
   var data = sheet.getDataRange().getValues();
   if (data.length <= 1) return null;
   
+  var searchId = String(uid).trim();
   for (var i = 1; i < data.length; i++) {
-    if (data[i][0] === uid) {
+    var cellValue = String(data[i][0]).trim();
+    if (cellValue === searchId) {
       return {
         uid: data[i][0],
         email: data[i][1],
@@ -152,7 +214,9 @@ function getUserByUid(sheet, uid) {
         joinedDate: data[i][3],
         verifiedStatus: String(data[i][4]) === 'true',
         phone: data[i][5],
-        listingRefs: data[i][6] ? JSON.parse(data[i][6]) : []
+        listingRefs: data[i][6] ? JSON.parse(data[i][6]) : [],
+        password: data[i][7] || "",
+        otpCode: data[i][8] || ""
       };
     }
   }
@@ -162,9 +226,11 @@ function getUserByUid(sheet, uid) {
 function saveUserProfile(sheet, profile) {
   var data = sheet.getDataRange().getValues();
   var rowIndex = -1;
+  var searchId = String(profile.uid).trim();
   
   for (var i = 1; i < data.length; i++) {
-    if (data[i][0] === profile.uid) {
+    var cellValue = String(data[i][0]).trim();
+    if (cellValue === searchId) {
       rowIndex = i + 1; // 1-indexed and skipping header
       break;
     }
@@ -177,7 +243,9 @@ function saveUserProfile(sheet, profile) {
     profile.joinedDate,
     profile.verifiedStatus,
     profile.phone || "",
-    profile.listingRefs ? JSON.stringify(profile.listingRefs) : "[]"
+    profile.listingRefs ? JSON.stringify(profile.listingRefs) : "[]",
+    profile.password || "",
+    profile.otpCode || ""
   ];
   
   if (rowIndex > -1) {
@@ -186,6 +254,19 @@ function saveUserProfile(sheet, profile) {
     sheet.appendRow(rowData);
   }
   return true;
+}
+
+function deleteUserRow(sheet, uid) {
+  var data = sheet.getDataRange().getValues();
+  var searchId = String(uid).trim();
+  for (var i = 1; i < data.length; i++) {
+    var cellValue = String(data[i][0]).trim();
+    if (cellValue === searchId) {
+      sheet.deleteRow(i + 1);
+      return true;
+    }
+  }
+  return false;
 }
 
 function getListings(sheet) {
@@ -223,7 +304,6 @@ function getListings(sheet) {
 }
 
 function getOrCreateParentFolder() {
-  // If the user has configured their own custom PARENT_FOLDER_ID and it's valid, use it
   if (typeof PARENT_FOLDER_ID !== 'undefined' && PARENT_FOLDER_ID && PARENT_FOLDER_ID !== "YOUR_FOLDER_ID_HERE" && PARENT_FOLDER_ID.trim() !== "") {
     try {
       return DriveApp.getFolderById(PARENT_FOLDER_ID);
@@ -232,7 +312,6 @@ function getOrCreateParentFolder() {
     }
   }
   
-  // Otherwise, look for or create a default "FlashmyDeal_Uploads" folder in their root Drive
   var root = DriveApp.getRootFolder();
   var folders = root.getFoldersByName("FlashmyDeal_Uploads");
   if (folders.hasNext()) {
@@ -280,16 +359,13 @@ function createListingInDriveAndSheet(sheet, payload) {
         continue;
       }
       
-      // Separate base64 string from data URI headers dynamically
       if (base64Data.indexOf(",") > -1) {
         base64Data = base64Data.split(",")[1];
       }
       
-      // Clean up base64 string: convert WebSafe Base64 characters, strip spaces and line-breaks
       base64Data = base64Data.replace(/-/g, "+").replace(/_/g, "/");
       base64Data = base64Data.replace(/[^A-Za-z0-9\+\/=]/g, "");
       
-      // Fix string padding if required (length must be multiple of 4)
       var padNeeded = base64Data.length % 4;
       if (padNeeded > 0) {
         base64Data += "====".slice(padNeeded);
@@ -314,7 +390,6 @@ function createListingInDriveAndSheet(sheet, payload) {
       
       file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
       
-      // Direct high-compatibility link for image view (bypasses third-party cookie block on standard browsers)
       var fileId = file.getId();
       var directUrl = "https://drive.google.com/thumbnail?id=" + fileId + "&sz=w1200";
       imageUrls.push(directUrl);
@@ -375,7 +450,7 @@ function updateListingStatus(sheet, listingId, status) {
   for (var i = 1; i < data.length; i++) {
     var cellValue = String(data[i][0]).trim();
     if (cellValue === searchId) {
-      sheet.getRange(i + 1, 14).setValue(status); // Status is in 14th column (1-indexed)
+      sheet.getRange(i + 1, 14).setValue(status);
       return true;
     }
   }
@@ -395,4 +470,3 @@ function deleteListingRow(sheet, listingId) {
   return false;
 }
 ```
-

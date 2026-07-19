@@ -311,11 +311,13 @@ export default function App() {
     // Search keyword match (title, description, tags, category, location)
     if (searchQuery.trim() !== '') {
       const q = searchQuery.toLowerCase();
-      const matchTitle = item.title.toLowerCase().includes(q);
-      const matchDesc = item.description.toLowerCase().includes(q);
-      const matchCategory = item.category.toLowerCase().includes(q);
-      const matchLocation = item.location.toLowerCase().includes(q);
-      const matchTags = item.tags.some(tag => tag.toLowerCase().includes(q));
+      const matchTitle = item.title ? item.title.toLowerCase().includes(q) : false;
+      const matchDesc = item.description ? item.description.toLowerCase().includes(q) : false;
+      const matchCategory = item.category ? item.category.toLowerCase().includes(q) : false;
+      const matchLocation = item.location ? item.location.toLowerCase().includes(q) : false;
+      const matchTags = Array.isArray(item.tags)
+        ? item.tags.some(tag => typeof tag === 'string' && tag.toLowerCase().includes(q))
+        : false;
 
       if (!matchTitle && !matchDesc && !matchCategory && !matchLocation && !matchTags) {
         return false;
@@ -357,6 +359,7 @@ export default function App() {
       {/* Navbar Component */}
       <Navbar 
         user={currentUser} 
+        userProfile={userProfile}
         onOpenAuth={(mode) => {
           setAuthInitialMode(mode);
           setAuthModalOpen(true);
@@ -692,17 +695,18 @@ export default function App() {
               )
             ) : (
               /* Empty state */
-              <div className="text-center py-20 rounded-2xl border border-dashed border-gray-800 bg-obsidian-950/20 space-y-3">
+              <div className="text-center py-20 rounded-2xl border border-dashed border-gray-800 bg-obsidian-950/20 space-y-3" id="no-items-container">
                 <AlertCircle className="w-10 h-10 text-gray-600 mx-auto" />
-                <h4 className="text-base font-bold text-white">No Matched Ads found</h4>
+                <h4 className="text-base font-bold text-white">No items found</h4>
                 <p className="text-xs text-gray-500 max-w-sm mx-auto">
-                  Try clearing your active filters or searching for another keyword. Let's list some items!
+                  No items match your search. Try typing another keyword, tag name, or resetting your filter options.
                 </p>
                 <button
                   onClick={handleClearFilters}
                   className="px-4 py-2 rounded-xl text-xs font-bold bg-gray-800 text-white border border-gray-700 hover:bg-gray-700 transition-all"
+                  id="clear-filters-btn"
                 >
-                  Clear Active Filters
+                  Reset & Show All Items
                 </button>
               </div>
             )}
