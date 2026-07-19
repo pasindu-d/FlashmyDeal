@@ -246,17 +246,17 @@ function GiftCountdown({ verifiedDate, joinedDate }: { verifiedDate?: string; jo
   const [timeLeft, setTimeLeft] = useState<{ days: number; hours: number; minutes: number; seconds: number } | null>(null);
 
   useEffect(() => {
-    let verifiedTime = Date.now();
-    if (verifiedDate) {
-      const parsed = new Date(verifiedDate).getTime();
-      if (!isNaN(parsed)) verifiedTime = parsed;
-    } else if (joinedDate) {
+    let baseTime = Date.now();
+    if (joinedDate) {
       // Parse joinedDate if possible. Standard joinedDate looks like "July 19, 2026"
       const parsed = new Date(joinedDate).getTime();
-      if (!isNaN(parsed)) verifiedTime = parsed;
+      if (!isNaN(parsed)) baseTime = parsed;
+    } else if (verifiedDate) {
+      const parsed = new Date(verifiedDate).getTime();
+      if (!isNaN(parsed)) baseTime = parsed;
     }
 
-    const expireTime = verifiedTime + 30 * 24 * 60 * 60 * 1000;
+    const expireTime = baseTime + 30 * 24 * 60 * 60 * 1000;
 
     const updateTimer = () => {
       const diff = expireTime - Date.now();

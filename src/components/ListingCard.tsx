@@ -67,7 +67,7 @@ export default function ListingCard({ listing, onClick, isFavorite = false, onTo
             src={listing.images[0]}
             alt={listing.title}
             referrerPolicy="no-referrer"
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+            className="h-full w-full object-contain transition-transform duration-500 group-hover:scale-115 origin-center"
             onError={(e) => {
               // Fallback placeholder image if Google Drive link fails to load
               (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=600&auto=format&fit=crop&q=60';

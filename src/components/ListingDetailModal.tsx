@@ -28,6 +28,15 @@ export default function ListingDetailModal({
   const [revealPhone, setRevealPhone] = useState(false);
   const [confirmSold, setConfirmSold] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [zoomPos, setZoomPos] = useState({ x: 50, y: 50 });
+  const [isZooming, setIsZooming] = useState(false);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const { left, top, width, height } = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - left) / width) * 100;
+    const y = ((e.clientY - top) / height) * 100;
+    setZoomPos({ x, y });
+  };
 
   const images = listing.images && listing.images.length > 0 
     ? listing.images 
@@ -82,7 +91,15 @@ export default function ListingDetailModal({
             {/* Left Side: Images & Gallery (7 cols on Desktop) */}
             <div className="md:col-span-7 space-y-3">
               {/* Main Image View */}
-              <div className="relative aspect-video rounded-xl bg-obsidian-950 overflow-hidden border border-gray-800/80 flex items-center justify-center">
+              <div 
+                onMouseMove={handleMouseMove}
+                onMouseEnter={() => setIsZooming(true)}
+                onMouseLeave={() => {
+                  setIsZooming(false);
+                  setZoomPos({ x: 50, y: 50 });
+                }}
+                className="relative aspect-video rounded-xl bg-obsidian-950 overflow-hidden border border-gray-800/80 flex items-center justify-center cursor-zoom-in group"
+              >
                 {isSold && (
                   <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/60 backdrop-blur-xs">
                     <span className="rounded-xl border border-red-500/30 bg-red-950/80 px-4 py-2 text-sm font-black uppercase tracking-widest text-red-400">
@@ -90,11 +107,24 @@ export default function ListingDetailModal({
                     </span>
                   </div>
                 )}
+                
+                {/* Hover zoom instruction banner */}
+                {!isSold && (
+                  <div className="absolute bottom-3 right-3 z-10 px-2 py-1 rounded bg-black/75 border border-gray-800 text-[9px] font-semibold text-gray-300 backdrop-blur-sm pointer-events-none transition-opacity duration-300 group-hover:opacity-0 flex items-center gap-1">
+                    <span>🔍 Hover to Zoom</span>
+                  </div>
+                )}
+
                 <img
                   src={images[activeImageIdx]}
                   alt={listing.title}
                   referrerPolicy="no-referrer"
-                  className="h-full w-full object-cover"
+                  style={{
+                    transformOrigin: `${zoomPos.x}% ${zoomPos.y}%`,
+                  }}
+                  className={`h-full w-full object-contain transition-transform duration-200 ease-out ${
+                    isZooming ? 'scale-175' : 'scale-100'
+                  }`}
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=800&auto=format&fit=crop&q=60';
                   }}
@@ -106,22 +136,22 @@ export default function ListingDetailModal({
                 <div className="grid grid-cols-4 gap-2.5">
                   {images.map((img, idx) => (
                     <button
-                      key={idx}
-                      onClick={() => setActiveImageIdx(idx)}
-                      className={`relative aspect-video rounded-lg overflow-hidden border-2 bg-obsidian-950 transition-all ${
-                        activeImageIdx === idx ? 'border-vibrant-teal scale-[0.98]' : 'border-transparent hover:border-gray-700'
-                      }`}
-                    >
-                      <img
-                        src={img}
-                        alt={`Preview ${idx + 1}`}
-                        referrerPolicy="no-referrer"
-                        className="h-full w-full object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=200&auto=format&fit=crop&q=60';
-                        }}
-                      />
-                    </button>
+                       key={idx}
+                       onClick={() => setActiveImageIdx(idx)}
+                       className={`relative aspect-video rounded-lg overflow-hidden border-2 bg-obsidian-950 transition-all ${
+                         activeImageIdx === idx ? 'border-vibrant-teal scale-[0.98]' : 'border-transparent hover:border-gray-700'
+                       }`}
+                     >
+                       <img
+                         src={img}
+                         alt={`Preview ${idx + 1}`}
+                         referrerPolicy="no-referrer"
+                         className="h-full w-full object-contain"
+                         onError={(e) => {
+                           (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=200&auto=format&fit=crop&q=60';
+                         }}
+                       />
+                     </button>
                   ))}
                 </div>
               )}

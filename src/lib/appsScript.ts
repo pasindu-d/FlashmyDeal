@@ -317,6 +317,12 @@ export async function apiGetUserProfile(uid: string): Promise<UserProfile | null
       } else {
         data.verifiedStatus = !!data.verifiedStatus;
       }
+
+      // Preserve local-only fields like verifiedDate from the local storage cache
+      const localProfile = getLocalUserProfile(uid);
+      if (localProfile && localProfile.verifiedDate && !data.verifiedDate) {
+        data.verifiedDate = localProfile.verifiedDate;
+      }
     }
     return data;
   } catch (err) {
