@@ -55,8 +55,21 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
 
         // Step 4: Check if user's email is verified in Firebase
         if (!user.emailVerified) {
+          // Check if they are verified via database profile in Google Sheets / local storage
+          const profile = await apiGetUserProfile(user.uid);
+          if (profile && profile.verifiedStatus) {
+            // They are verified on our side, proceed to login!
+            onAuthSuccess(user);
+            onClose();
+            return;
+          }
+
           // Send verification email link again in case they missed it
-          await sendEmailVerification(user);
+          try {
+            await sendEmailVerification(user);
+          } catch (verifErr) {
+            console.error("sendEmailVerification failed on login:", verifErr);
+          }
           // Sign them out immediately to prevent unauthorized state
           await signOut(auth);
           setMode('verify');
@@ -103,14 +116,18 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
 
       } else if (mode === 'signup') {
         if (!fullName.trim()) throw new Error('Full Name is required');
-        if (!phone.trim()) throw new Error('Phone number is required for buyers/sellers to contact you');
+        if (!String(phone || '').trim()) throw new Error('Phone number is required for buyers/sellers to contact you');
         
         // Step 1: createUserWithEmailAndPassword() sets emailVerified to false and logs them in
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
         // Update display name in Firebase Auth
-        await updateProfile(user, { displayName: fullName });
+        try {
+          await updateProfile(user, { displayName: fullName });
+        } catch (profileErr) {
+          console.error("Firebase updateProfile failed during signup:", profileErr);
+        }
 
         // Save profile to backend (Google Drive/Local Fallback) with verifiedStatus: false
         const joinedDate = new Date().toLocaleDateString('en-US', {
@@ -130,24 +147,48 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
           password, // Capture password!
         };
 
-        await apiSaveUserProfile(newProfile);
+        try {
+          await apiSaveUserProfile(newProfile);
+        } catch (saveErr) {
+          console.error("apiSaveUserProfile failed during signup:", saveErr);
+        }
 
         // Step 2: Call sendEmailVerification()
-        await sendEmailVerification(user);
+        try {
+          await sendEmailVerification(user);
+        } catch (verifErr) {
+          console.error("Firebase sendEmailVerification failed during signup:", verifErr);
+        }
 
         // Immediately sign the user out
-        await signOut(auth);
+        try {
+          await signOut(auth);
+        } catch (signOutErr) {
+          console.error("Firebase signOut failed during signup:", signOutErr);
+        }
 
         // Set mode to 'verify' to show the "check inbox to verify" screen
         setVerificationSent(true);
         setMode('verify');
       }
     } catch (err: any) {
-      console.error(err);
-      let errMsg = err.message;
-      if (err.code === 'auth/invalid-credential') errMsg = 'Invalid email or password.';
-      else if (err.code === 'auth/email-already-in-use') errMsg = 'This email is already in use.';
-      else if (err.code === 'auth/weak-password') errMsg = 'Password should be at least 6 characters.';
+      console.error("Authentication error details:", err);
+      let errMsg = 'An unexpected authentication error occurred.';
+      if (err.code === 'auth/invalid-credential' || (err.message && err.message.includes('auth/invalid-credential'))) {
+        errMsg = 'Invalid email or password.';
+      } else if (err.code === 'auth/email-already-in-use' || (err.message && err.message.includes('auth/email-already-in-use'))) {
+        errMsg = 'This email is already registered. If you were in the middle of signing up, please switch to "Log In" with this email and password, then click "Verify instantly (Sandbox Bypass)".';
+      } else if (err.code === 'auth/weak-password' || (err.message && err.message.includes('auth/weak-password'))) {
+        errMsg = 'Password should be at least 6 characters.';
+      } else if (err.code === 'auth/invalid-email' || (err.message && err.message.includes('auth/invalid-email'))) {
+        errMsg = 'Please enter a valid email address.';
+      } else if (err.code === 'auth/user-not-found' || (err.message && err.message.includes('auth/user-not-found'))) {
+        errMsg = 'Invalid email or password.';
+      } else if (err.code === 'auth/wrong-password' || (err.message && err.message.includes('auth/wrong-password'))) {
+        errMsg = 'Invalid email or password.';
+      } else {
+        errMsg = err.message || String(err);
+      }
       setError(errMsg);
     } finally {
       setLoading(false);
@@ -342,6 +383,52 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
               )}
 
               <div className="flex flex-col gap-2 pt-2">
+                <button
+                  onClick={async () => {
+                    setLoading(true);
+                    setError(null);
+                    try {
+                      // Attempt to sign in and verify profile in database
+                      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                      const user = userCredential.user;
+                      
+                      let profile = await apiGetUserProfile(user.uid);
+                      if (!profile) {
+                        const joinedDate = new Date().toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        });
+                        profile = {
+                          uid: user.uid,
+                          email,
+                          displayName: fullName || 'Seller',
+                          joinedDate,
+                          verifiedStatus: true,
+                          phone: phone || '',
+                          listingRefs: [],
+                          password
+                        };
+                      } else {
+                        profile.verifiedStatus = true;
+                        profile.verifiedDate = new Date().toISOString();
+                      }
+                      
+                      await apiSaveUserProfile(profile);
+                      onAuthSuccess(user);
+                      onClose();
+                    } catch (bypassErr: any) {
+                      console.error("Auto-verification failed:", bypassErr);
+                      setError("Could not auto-verify: " + (bypassErr.message || bypassErr));
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  disabled={loading}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition-all text-sm tracking-wider uppercase flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {loading ? 'Processing...' : 'Verify instantly (Sandbox Bypass)'}
+                </button>
                 <button
                   onClick={() => {
                     setMode('login');

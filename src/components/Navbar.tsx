@@ -15,6 +15,10 @@ interface NavbarProps {
 
 export default function Navbar({ user, userProfile, onOpenAuth, onOpenPostAd }: NavbarProps) {
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const saved = localStorage.getItem('theme');
@@ -37,6 +41,8 @@ export default function Navbar({ user, userProfile, onOpenAuth, onOpenPostAd }: 
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setShowDropdown(false);
+        setShowDeleteConfirm(false);
+        setDeleteError(null);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -53,14 +59,16 @@ export default function Navbar({ user, userProfile, onOpenAuth, onOpenPostAd }: 
   };
 
   const handleDeleteAccount = async () => {
-    const confirmDelete = window.confirm(
-      "WARNING: This will permanently delete your seller profile and credentials. This action is irreversible. Do you wish to continue?"
-    );
-    if (!confirmDelete) return;
+    setIsDeleting(true);
+    setDeleteError(null);
 
     try {
       const currentUser = auth.currentUser;
-      if (!currentUser) return;
+      if (!currentUser) {
+        setDeleteError("No active user session found.");
+        setIsDeleting(false);
+        return;
+      }
 
       const uid = currentUser.uid;
       const appsScriptUrl = getAppsScriptUrl();
@@ -105,17 +113,30 @@ export default function Navbar({ user, userProfile, onOpenAuth, onOpenPostAd }: 
         }
       }
 
+      const localListingsStr = localStorage.getItem('flashmydeal_local_listings');
+      if (localListingsStr) {
+        try {
+          const listings = JSON.parse(localListingsStr);
+          if (Array.isArray(listings)) {
+            const updatedListings = listings.filter((l: any) => l.sellerId !== uid);
+            localStorage.setItem('flashmydeal_local_listings', JSON.stringify(updatedListings));
+          }
+        } catch (lsErr) {
+          console.error('Error clearing local user listings cache:', lsErr);
+        }
+      }
+
       // 4. Delete from Firebase Authentication
       try {
         await deleteFirebaseAuthUser(currentUser);
       } catch (authErr: any) {
         if (authErr.code === 'auth/requires-recent-login') {
-          alert("For security reasons, deleting your account requires a recent sign-in. Please log out, sign in again, and retry.");
-          return; // Stop here so they can sign in again as prompted.
+          setDeleteError("For security reasons, deleting your account requires a recent sign-in. Please log out, sign in again, and retry.");
+          setIsDeleting(false);
+          return;
         } else {
           console.error("Firebase auth delete failed:", authErr);
-          // If we can't delete from auth for other reasons, we alert and still proceed to clear local session
-          alert("Firebase Authentication removal failed: " + (authErr.message || authErr));
+          // If auth delete fails, we can still attempt to sign out so they aren't stuck
         }
       }
 
@@ -128,7 +149,8 @@ export default function Navbar({ user, userProfile, onOpenAuth, onOpenPostAd }: 
       window.location.href = window.location.origin;
     } catch (err: any) {
       console.error("Account deletion failed:", err);
-      alert("Failed to delete account completely: " + (err.message || err));
+      setDeleteError("Failed to delete account: " + (err.message || err));
+      setIsDeleting(false);
     }
   };
 
@@ -204,43 +226,87 @@ export default function Navbar({ user, userProfile, onOpenAuth, onOpenPostAd }: 
                       />
                     </div>
 
-                    {/* Options list */}
-                    <div className="space-y-1">
-                      {/* Daylight / Nightlight Mode Toggle Option */}
-                      <div className="flex items-center justify-between w-full px-2.5 py-2 rounded-xl text-xs font-semibold text-gray-300 hover:text-white hover:bg-white/5 transition-all">
-                        <span className="flex items-center gap-2">
-                          {theme === 'light' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-blue-400" />}
-                          Theme Settings
-                        </span>
+                    {/* Options list / Delete Confirm */}
+                    {showDeleteConfirm ? (
+                      <div className="space-y-3 p-1">
+                        <div className="p-3 rounded-xl bg-red-950/40 border border-red-500/30 text-[11px] text-red-200 font-medium leading-relaxed">
+                          ⚠️ <span className="font-bold">WARNING:</span> This will permanently delete your seller profile and credentials. This action is irreversible. Do you wish to continue?
+                        </div>
+
+                        {deleteError && (
+                          <div className="p-2.5 rounded-lg bg-amber-950/30 border border-amber-500/30 text-[10px] text-amber-300 font-semibold leading-normal">
+                            {deleteError}
+                          </div>
+                        )}
+
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setShowDeleteConfirm(false);
+                              setDeleteError(null);
+                            }}
+                            disabled={isDeleting}
+                            className="flex-1 py-1.5 text-center text-xs font-bold rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 transition-all cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleDeleteAccount}
+                            disabled={isDeleting}
+                            className="flex-1 py-1.5 text-center text-xs font-bold rounded-lg bg-red-600 hover:bg-red-500 text-white transition-all shadow-md shadow-red-950/50 cursor-pointer flex items-center justify-center gap-1"
+                          >
+                            {isDeleting ? (
+                              <>
+                                <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent"></span>
+                                Deleting...
+                              </>
+                            ) : (
+                              'Yes, Delete'
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        {/* Daylight / Nightlight Mode Toggle Option */}
+                        <div className="flex items-center justify-between w-full px-2.5 py-2 rounded-xl text-xs font-semibold text-gray-300 hover:text-white hover:bg-white/5 transition-all">
+                          <span className="flex items-center gap-2">
+                            {theme === 'light' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-blue-400" />}
+                            Theme Settings
+                          </span>
+                          <button
+                            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                            className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-gray-800 text-[10px] font-bold uppercase transition-all hover:bg-gray-700 cursor-pointer"
+                          >
+                            {theme === 'light' ? 'Day Light' : 'Night Light'}
+                          </button>
+                        </div>
+
+                        {/* Spacer/Divider */}
+                        <div className="border-t border-gray-800 my-1" />
+
+                        {/* Sign Out Action */}
                         <button
-                          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                          className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-gray-800 text-[10px] font-bold uppercase transition-all hover:bg-gray-700"
+                          onClick={handleSignOut}
+                          className="flex items-center gap-2 w-full px-2.5 py-2 rounded-xl text-xs font-semibold text-gray-300 hover:text-white hover:bg-white/5 transition-all text-left cursor-pointer"
                         >
-                          {theme === 'light' ? 'Day Light' : 'Night Light'}
+                          <LogOut className="w-4 h-4 text-gray-400" />
+                          Sign Out
+                        </button>
+
+                        {/* Delete Account Action */}
+                        <button
+                          onClick={() => {
+                            setShowDeleteConfirm(true);
+                            setDeleteError(null);
+                          }}
+                          className="flex items-center gap-2 w-full px-2.5 py-2 rounded-xl text-xs font-semibold text-red-400 hover:text-red-300 hover:bg-red-950/20 transition-all text-left cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Delete Account
                         </button>
                       </div>
-
-                      {/* Spacer/Divider */}
-                      <div className="border-t border-gray-800 my-1" />
-
-                      {/* Sign Out Action */}
-                      <button
-                        onClick={handleSignOut}
-                        className="flex items-center gap-2 w-full px-2.5 py-2 rounded-xl text-xs font-semibold text-gray-300 hover:text-white hover:bg-white/5 transition-all text-left"
-                      >
-                        <LogOut className="w-4 h-4 text-gray-400" />
-                        Sign Out
-                      </button>
-
-                      {/* Delete Account Action */}
-                      <button
-                        onClick={handleDeleteAccount}
-                        className="flex items-center gap-2 w-full px-2.5 py-2 rounded-xl text-xs font-semibold text-red-400 hover:text-red-300 hover:bg-red-950/20 transition-all text-left"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        Delete Account
-                      </button>
-                    </div>
+                    )}
                   </div>
                 )}
               </div>

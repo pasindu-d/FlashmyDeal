@@ -1,10 +1,10 @@
 {
-  "projectId": "soulmatch-d86d7",
-  "appId": "1:251935405651:web:21801d48c00fa03f7438a6",
-  "apiKey": "AIzaSyDlTSozif7Lt06mvX335o6Gbq4Kkw1UZmU",
-  "authDomain": "soulmatch-d86d7.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-flashmydeal-39b0a400-2e3e-40fe-9014-754e57123583",
-  "storageBucket": "soulmatch-d86d7.firebasestorage.app",
-  "messagingSenderId": "251935405651",
-  "measurementId": ""
+  "projectId": "flashmydeal",
+  "appId": "1:239151602196:web:83804b1242027c5a566501",
+  "apiKey": "AIzaSyDQpQA5eiW8aHgl6P-s1JNnhQRaX_tpnD0",
+  "authDomain": "flashmydeal.firebaseapp.com",
+  "firestoreDatabaseId": "",
+  "storageBucket": "flashmydeal.firebasestorage.app",
+  "messagingSenderId": "239151602196",
+  "measurementId": "G-JDP6ZGWGNL"
 }

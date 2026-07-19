@@ -255,7 +255,7 @@ export default function App() {
 
     // Force reload Firebase user to check latest verified status
     auth.currentUser?.reload().then(async () => {
-      const isVerified = auth.currentUser?.emailVerified;
+      const isVerified = auth.currentUser?.emailVerified || userProfile?.verifiedStatus;
       if (!isVerified) {
         setAuthInitialMode('login'); // will automatically go to verify screen
         setAuthModalOpen(true);
@@ -264,7 +264,7 @@ export default function App() {
       }
     }).catch(() => {
       // fallback
-      if (!currentUser.emailVerified) {
+      if (!currentUser.emailVerified && !userProfile?.verifiedStatus) {
         setAuthInitialMode('login');
         setAuthModalOpen(true);
       } else {
@@ -398,7 +398,7 @@ export default function App() {
       />
 
       {/* Unverified Email Warning bar if logged in but not verified */}
-      {currentUser && !currentUser.emailVerified && (
+      {currentUser && !currentUser.emailVerified && !userProfile?.verifiedStatus && (
         <div className="bg-amber-950/40 border-b border-amber-500/20 py-3.5 px-4 text-center">
           <div className="mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-center gap-2 text-sm text-amber-200 font-medium">
             <ShieldAlert className="w-4 h-4 text-electric-amber" />

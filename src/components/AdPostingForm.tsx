@@ -28,7 +28,7 @@ export default function AdPostingForm({ isOpen, onClose, userId, userName, userP
   const [category, setCategory] = useState('');
   const [condition, setCondition] = useState<any>('Good');
   const [location, setLocation] = useState('');
-  const [phone, setPhone] = useState(userPhone || '');
+  const [phone, setPhone] = useState(userPhone ? String(userPhone) : '');
   const [description, setDescription] = useState('');
   const [tagsInput, setTagsInput] = useState('');
 
@@ -138,7 +138,7 @@ export default function AdPostingForm({ isOpen, onClose, userId, userName, userP
       if (!price || Number(price) <= 0) { setError('A valid Price is required'); return; }
       if (!category) { setError('Please select a Category'); return; }
       if (!location) { setError('Please select a Location'); return; }
-      if (!phone.trim()) { setError('Contact phone number is required'); return; }
+      if (!String(phone || '').trim()) { setError('Contact phone number is required'); return; }
       if (!description.trim()) { setError('Description is required'); return; }
       setStep(2);
     }

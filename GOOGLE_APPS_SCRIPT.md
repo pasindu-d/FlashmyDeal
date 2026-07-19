@@ -98,7 +98,7 @@ function doPost(e) {
     }
     
     if (action === 'deleteUser') {
-      var success = deleteUserRow(sheets.usersSheet, postData.uid);
+      var success = deleteUserAndListings(sheets.usersSheet, sheets.listingsSheet, postData.uid);
       return jsonResponse({ success: success });
     }
     
@@ -256,17 +256,65 @@ function saveUserProfile(sheet, profile) {
   return true;
 }
 
-function deleteUserRow(sheet, uid) {
-  var data = sheet.getDataRange().getValues();
-  var searchId = String(uid).trim();
-  for (var i = 1; i < data.length; i++) {
-    var cellValue = String(data[i][0]).trim();
-    if (cellValue === searchId) {
-      sheet.deleteRow(i + 1);
-      return true;
+function deleteUserAndListings(usersSheet, listingsSheet, uid) {
+  var searchUid = String(uid).trim();
+  
+  // 1. Delete associated listings and their Drive folders
+  if (listingsSheet) {
+    var listingsData = listingsSheet.getDataRange().getValues();
+    // Iterate backwards when deleting rows to maintain correct indices
+    for (var j = listingsData.length - 1; j >= 1; j--) {
+      var sellerId = String(listingsData[j][11]).trim();
+      if (sellerId === searchUid) {
+        var imagesStr = listingsData[j][14];
+        var imageUrls = [];
+        try {
+          imageUrls = JSON.parse(imagesStr) || [];
+        } catch (e) {
+          if (imagesStr && typeof imagesStr === 'string') {
+            imageUrls = [imagesStr];
+          }
+        }
+        
+        // Try to trash the Drive folder of this listing
+        for (var k = 0; k < imageUrls.length; k++) {
+          var url = imageUrls[k];
+          var fileIdMatch = url.match(/(?:id=|d\/|file\/d\/)([a-zA-Z0-9_-]{25,})/);
+          if (fileIdMatch && fileIdMatch[1]) {
+            var fileId = fileIdMatch[1];
+            try {
+              var file = DriveApp.getFileById(fileId);
+              var parents = file.getParents();
+              if (parents.hasNext()) {
+                var parentFolder = parents.next();
+                parentFolder.setTrashed(true);
+                break; // Found and trashed the listing folder
+              }
+            } catch (err) {
+              Logger.log("Failed to trash folder or file for ID: " + fileId + ", error: " + err.toString());
+            }
+          }
+        }
+        
+        // Delete the listing row
+        listingsSheet.deleteRow(j + 1);
+      }
     }
   }
-  return false;
+  
+  // 2. Delete user profile row
+  var usersData = usersSheet.getDataRange().getValues();
+  var userDeleted = false;
+  for (var i = 1; i < usersData.length; i++) {
+    var cellValue = String(usersData[i][0]).trim();
+    if (cellValue === searchUid) {
+      usersSheet.deleteRow(i + 1);
+      userDeleted = true;
+      break;
+    }
+  }
+  
+  return userDeleted;
 }
 
 function getListings(sheet) {
@@ -463,6 +511,38 @@ function deleteListingRow(sheet, listingId) {
   for (var i = 1; i < data.length; i++) {
     var cellValue = String(data[i][0]).trim();
     if (cellValue === searchId) {
+      // 1. Get the image URLs to find the Google Drive folder of this listing
+      var imagesStr = data[i][14];
+      var imageUrls = [];
+      try {
+        imageUrls = JSON.parse(imagesStr) || [];
+      } catch (e) {
+        if (imagesStr && typeof imagesStr === 'string') {
+          imageUrls = [imagesStr];
+        }
+      }
+      
+      // 2. Try to trash the Drive parent folder of these images
+      for (var k = 0; k < imageUrls.length; k++) {
+        var url = imageUrls[k];
+        var fileIdMatch = url.match(/(?:id=|d\/|file\/d\/)([a-zA-Z0-9_-]{25,})/);
+        if (fileIdMatch && fileIdMatch[1]) {
+          var fileId = fileIdMatch[1];
+          try {
+            var file = DriveApp.getFileById(fileId);
+            var parents = file.getParents();
+            if (parents.hasNext()) {
+              var parentFolder = parents.next();
+              parentFolder.setTrashed(true);
+              break; // Found and trashed the listing's folder
+            }
+          } catch (err) {
+            Logger.log("Failed to trash folder or file for ID: " + fileId + ", error: " + err.toString());
+          }
+        }
+      }
+      
+      // 3. Delete the listing row
       sheet.deleteRow(i + 1);
       return true;
     }
