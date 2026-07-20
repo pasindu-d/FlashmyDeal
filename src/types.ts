@@ -38,8 +38,10 @@ export interface GlobalRegistry {
 export const CATEGORIES = [
   'Electronics',
   'Vehicles',
+  'Vehicle Rent',
   'Property',
   'Home & Garden',
+  'Foods',
   'Fashion & Beauty',
   'Hobby, Sport & Kids',
   'Business & Industry',
