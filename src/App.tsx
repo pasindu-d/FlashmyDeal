@@ -66,6 +66,7 @@ export default function App() {
 
   // Ad posting form state
   const [postAdOpen, setPostAdOpen] = useState(false);
+  const [editingListing, setEditingListing] = useState<ProductListing | null>(null);
 
   // Selected Listing state for details modal
   const [selectedListing, setSelectedListing] = useState<ProductListing | null>(null);
@@ -469,17 +470,24 @@ export default function App() {
     }
   };
 
-  const handleNewListingSuccess = (newListing: ProductListing) => {
-    setListings(prev => [newListing, ...prev]);
-    // Refresh counters
-    fetchStorageStatus();
-    
-    if (newListing.imageErrors && newListing.imageErrors.length > 0) {
-      console.warn('[App] Listing published with image errors:', newListing.imageErrors);
-      showToast(`Ad published, but images failed to upload: ${newListing.imageErrors[0]}`, 'error');
+  const handleListingSaveSuccess = (listing: ProductListing) => {
+    if (editingListing) {
+      setListings(prev => prev.map(l => l.id === listing.id ? listing : l));
+      if (selectedListing && selectedListing.id === listing.id) {
+        setSelectedListing(listing);
+      }
+      showToast('Deal listing updated successfully!', 'success');
+      setEditingListing(null);
     } else {
-      showToast('Deal listing published successfully!', 'success');
+      setListings(prev => [listing, ...prev]);
+      if (listing.imageErrors && listing.imageErrors.length > 0) {
+        console.warn('[App] Listing published with image errors:', listing.imageErrors);
+        showToast(`Ad published, but images failed to upload: ${listing.imageErrors[0]}`, 'error');
+      } else {
+        showToast('Deal listing published successfully!', 'success');
+      }
     }
+    fetchStorageStatus();
   };
 
   const handleClearFilters = () => {
@@ -964,11 +972,12 @@ export default function App() {
       {currentUser && (
         <AdPostingForm
           isOpen={postAdOpen}
-          onClose={() => setPostAdOpen(false)}
+          onClose={() => { setPostAdOpen(false); setEditingListing(null); }}
           userId={currentUser.uid}
           userName={currentUser.displayName || userProfile?.displayName || 'Seller'}
           userPhone={userProfile?.phone || ''}
-          onSuccess={handleNewListingSuccess}
+          onSuccess={handleListingSaveSuccess}
+          editListing={editingListing}
         />
       )}
 
@@ -980,6 +989,7 @@ export default function App() {
             onClose={() => setSelectedListing(null)}
             onMarkAsSold={handleMarkAsSold}
             onDeleteListing={handleDeleteListing}
+            onEditListing={(listing) => { setEditingListing(listing); setPostAdOpen(true); }}
             currentUserId={currentUser?.uid}
             isFavorite={favorites.includes(selectedListing.id)}
             onToggleFavorite={toggleFavorite}

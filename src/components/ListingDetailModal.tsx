@@ -8,6 +8,7 @@ interface ListingDetailModalProps {
   onClose: () => void;
   onMarkAsSold?: (id: string) => void;
   onDeleteListing?: (id: string) => void;
+  onEditListing?: (listing: ProductListing) => void;
   currentUserId?: string | null;
   isFavorite?: boolean;
   onToggleFavorite?: (id: string) => void;
@@ -19,6 +20,7 @@ export default function ListingDetailModal({
   onClose, 
   onMarkAsSold, 
   onDeleteListing, 
+  onEditListing,
   currentUserId,
   isFavorite = false,
   onToggleFavorite,
@@ -294,14 +296,13 @@ export default function ListingDetailModal({
                       Reveal Seller's Phone Number
                     </button>
                   ) : (
-                    <a
-                      href={`tel:${listing.phone}`}
-                      className="w-full border-2 border-vibrant-teal bg-vibrant-teal/5 text-vibrant-teal hover:bg-vibrant-teal/10 font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 text-base font-mono transition-all glow-teal text-center"
+                    <button
+                      type="button"
+                      className="w-full border-2 border-vibrant-teal bg-vibrant-teal/5 text-vibrant-teal font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 text-base font-mono transition-all glow-teal text-center cursor-default"
                     >
                       <Phone className="w-4 h-4 fill-current" />
                       {listing.phone}
-                      <span className="text-xs font-sans font-normal text-gray-400 ml-2">(Click to Call)</span>
-                    </a>
+                    </button>
                   )}
                 </div>
 
@@ -344,6 +345,14 @@ export default function ListingDetailModal({
               {/* Owner Actions */}
               {isOwner && (
                 <div className="pt-4 border-t border-gray-800 flex flex-col gap-2">
+                  {!isSold && onEditListing && (
+                    <button
+                      onClick={() => onEditListing(listing)}
+                      className="w-full bg-vibrant-teal hover:bg-vibrant-teal/90 text-obsidian-950 font-black py-2.5 rounded-xl text-xs uppercase tracking-wider transition-all cursor-pointer"
+                    >
+                      ✏️ Edit Listing Details & Images
+                    </button>
+                  )}
                   {!isSold && onMarkAsSold && (
                     confirmSold ? (
                       <div className="flex gap-2">

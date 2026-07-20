@@ -1,8 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { X, Upload, CheckCircle2, AlertTriangle, ArrowRight, ArrowLeft, Loader2, Sparkles, TrendingDown } from 'lucide-react';
 import { CATEGORIES, LOCATIONS, ProductListing } from '../types';
-import { apiCreateListing } from '../lib/appsScript';
+import { apiCreateListing, apiUpdateListing } from '../lib/appsScript';
 
 interface AdPostingFormProps {
   isOpen: boolean;
@@ -11,9 +11,10 @@ interface AdPostingFormProps {
   userName: string;
   userPhone: string;
   onSuccess: (newListing: ProductListing) => void;
+  editListing?: ProductListing | null;
 }
 
-export default function AdPostingForm({ isOpen, onClose, userId, userName, userPhone, onSuccess }: AdPostingFormProps) {
+export default function AdPostingForm({ isOpen, onClose, userId, userName, userPhone, onSuccess, editListing }: AdPostingFormProps) {
   if (!isOpen) return null;
 
   // Step 1: General Info, Step 2: Upload Images, Step 3: Publish
@@ -33,8 +34,42 @@ export default function AdPostingForm({ isOpen, onClose, userId, userName, userP
   const [tagsInput, setTagsInput] = useState('');
 
   // Image states
-  const [selectedImages, setSelectedImages] = useState<{ file: File; preview: string }[]>([]);
+  const [selectedImages, setSelectedImages] = useState<{ file: File | null; preview: string }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Populate state with edit data when editListing is provided
+  useEffect(() => {
+    if (editListing) {
+      setTitle(editListing.title || '');
+      setPrice(editListing.price ? String(editListing.price) : '');
+      setOriginalPrice(editListing.originalPrice ? String(editListing.originalPrice) : '');
+      setCategory(editListing.category || '');
+      setCondition(editListing.condition || 'Good');
+      setLocation(editListing.location || '');
+      setPhone(editListing.phone || '');
+      setDescription(editListing.description || '');
+      setTagsInput(editListing.tags ? editListing.tags.join(', ') : '');
+      
+      if (editListing.images && editListing.images.length > 0) {
+        setSelectedImages(editListing.images.map(url => ({ file: null, preview: url })));
+      } else {
+        setSelectedImages([]);
+      }
+      setStep(1);
+    } else {
+      setTitle('');
+      setPrice('');
+      setOriginalPrice('');
+      setCategory('');
+      setCondition('Good');
+      setLocation('');
+      setPhone(userPhone ? String(userPhone) : '');
+      setDescription('');
+      setTagsInput('');
+      setSelectedImages([]);
+      setStep(1);
+    }
+  }, [editListing, isOpen]);
 
   // Client-side image compression
   const compressImage = (file: File): Promise<Blob> => {
@@ -124,7 +159,9 @@ export default function AdPostingForm({ isOpen, onClose, userId, userName, userP
   const handleRemoveImage = (index: number) => {
     setSelectedImages((prev) => {
       const updated = [...prev];
-      URL.revokeObjectURL(updated[index].preview);
+      if (updated[index].preview && updated[index].preview.startsWith('blob:')) {
+        URL.revokeObjectURL(updated[index].preview);
+      }
       updated.splice(index, 1);
       return updated;
     });
@@ -179,42 +216,69 @@ export default function AdPostingForm({ isOpen, onClose, userId, userName, userP
         sellerName: userName,
       };
 
-      console.log('Preparing images as Base64 for Google Drive upload...');
+      console.log('Preparing images for upload...');
       const base64Images = [];
       for (let i = 0; i < selectedImages.length; i++) {
         const imgObj = selectedImages[i];
-        let blobToUse: Blob;
-        try {
-          blobToUse = await compressImage(imgObj.file);
-        } catch (compErr) {
-          console.warn('Image compression failed, falling back to original file:', compErr);
-          blobToUse = imgObj.file;
+        if (imgObj.file) {
+          let blobToUse: Blob;
+          try {
+            blobToUse = await compressImage(imgObj.file);
+          } catch (compErr) {
+            console.warn('Image compression failed, falling back to original file:', compErr);
+            blobToUse = imgObj.file;
+          }
+          
+          const base64Data = await blobToBase64(blobToUse);
+          base64Images.push({
+            name: imgObj.file.name || `compressed_img_${i + 1}.jpg`,
+            data: base64Data,
+            type: imgObj.file.type || 'image/jpeg'
+          });
+        } else {
+          // It is an existing image URL, pass it as action-friendly URL structure
+          base64Images.push({
+            name: 'existing_image',
+            data: imgObj.preview,
+            type: 'url'
+          });
         }
-        
-        const base64Data = await blobToBase64(blobToUse);
-        base64Images.push({
-          name: imgObj.file.name || `compressed_img_${i + 1}.jpg`,
-          data: base64Data,
-          type: imgObj.file.type || 'image/jpeg'
-        });
       }
 
-      console.log('Publishing listing to Google Sheets database...');
-      const newListing = await apiCreateListing(metadata, base64Images);
-      console.log('Deal published successfully:', newListing);
+      let finalListing;
+      if (editListing) {
+        console.log('Updating listing in Google Sheets database:', editListing.id);
+        finalListing = await apiUpdateListing(editListing.id, {
+          title,
+          price: Number(price),
+          originalPrice: originalPrice ? Number(originalPrice) : undefined,
+          currency: 'LKR' as const,
+          category,
+          condition,
+          location,
+          phone,
+          description,
+          tags,
+        }, base64Images);
+        console.log('Deal updated successfully:', finalListing);
+      } else {
+        console.log('Publishing listing to Google Sheets database...');
+        finalListing = await apiCreateListing(metadata, base64Images);
+        console.log('Deal published successfully:', finalListing);
+      }
       
-      onSuccess(newListing);
+      onSuccess(finalListing);
       onClose();
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'An unexpected error occurred while posting your ad.');
+      setError(err.message || 'An unexpected error occurred while posting/editing your ad.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-y-auto">
       {/* Backdrop */}
       <div onClick={onClose} className="absolute inset-0 bg-black/85 backdrop-blur-md" />
 
@@ -237,10 +301,10 @@ export default function AdPostingForm({ isOpen, onClose, userId, userName, userP
         {/* Form Header */}
         <div className="p-6 sm:p-8 border-b border-gray-800/80">
           <h2 className="text-2xl font-black text-white flex items-center gap-2">
-            <Sparkles className="w-6 h-6 text-electric-amber fill-current" /> Flash a New Deal
+            <Sparkles className="w-6 h-6 text-electric-amber fill-current" /> {editListing ? 'Edit Your Deal' : 'Flash a New Deal'}
           </h2>
           <p className="text-xs text-gray-400 mt-1">
-            Publish your ad in Sri Lanka's premium fast-sale catalog.
+            {editListing ? 'Modify your active listing on Sri Lanka\'s premium marketplace.' : 'Publish your ad in Sri Lanka\'s premium fast-sale catalog.'}
           </p>
 
           {/* Stepper indicator */}
@@ -474,14 +538,14 @@ export default function AdPostingForm({ isOpen, onClose, userId, userName, userP
             <button
               onClick={handlePublish}
               disabled={loading || selectedImages.length === 0}
-              className="flex items-center gap-1.5 px-6 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-electric-amber to-orange-500 text-obsidian-950 hover:opacity-95 disabled:opacity-50 transition-all uppercase tracking-wider"
+              className="flex items-center gap-1.5 px-6 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-electric-amber to-orange-500 text-obsidian-950 hover:opacity-95 disabled:opacity-50 transition-all uppercase tracking-wider cursor-pointer"
             >
               {loading ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" /> Publishing...
+                  <Loader2 className="w-4 h-4 animate-spin" /> {editListing ? 'Saving Changes...' : 'Publishing...'}
                 </>
               ) : (
-                'Publish Flash Deal'
+                editListing ? 'Save Listing Changes' : 'Publish Flash Deal'
               )}
             </button>
           )}

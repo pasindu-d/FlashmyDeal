@@ -101,6 +101,11 @@ function doPost(e) {
       return jsonResponse(listing);
     }
     
+    if (action === 'updateListing') {
+      var updated = updateListingRowData(sheets.listingsSheet, postData);
+      return jsonResponse(updated);
+    }
+    
     if (action === 'updateStatus') {
       var success = updateListingStatus(sheets.listingsSheet, postData.id, postData.status);
       return jsonResponse({ success: success });
@@ -610,6 +615,130 @@ function deleteListingRow(sheet, listingId) {
     }
   }
   return false;
+}
+
+function updateListingRowData(sheet, payload) {
+  var data = sheet.getDataRange().getValues();
+  var rowIndex = -1;
+  var searchId = String(payload.id).trim();
+  
+  for (var i = 1; i < data.length; i++) {
+    var cellValue = String(data[i][0]).trim();
+    if (cellValue === searchId) {
+      rowIndex = i + 1; // 1-indexed and skipping header
+      break;
+    }
+  }
+  
+  if (rowIndex === -1) {
+    return { error: "Listing not found: " + searchId };
+  }
+  
+  // Handle optional images upload
+  var imageUrls = [];
+  var existingImagesStr = data[rowIndex - 1][14];
+  try {
+    imageUrls = JSON.parse(existingImagesStr) || [];
+  } catch (e) {
+    if (existingImagesStr && typeof existingImagesStr === 'string') {
+      imageUrls = [existingImagesStr];
+    }
+  }
+  
+  if (payload.images && payload.images.length > 0) {
+    var folderName = "FlashmyDeal_" + payload.title.replace(/[^a-zA-Z0-9]/g, "_") + "_" + Date.now();
+    var listingFolder = null;
+    try {
+      var parentFolder = getOrCreateParentFolder();
+      listingFolder = parentFolder.createFolder(folderName);
+      listingFolder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    } catch (e) {
+      Logger.log("Failed to create subfolder: " + e.toString());
+      try {
+        listingFolder = DriveApp.getRootFolder().createFolder(folderName);
+        listingFolder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      } catch (rootErr) {}
+    }
+    
+    var uploadedUrls = [];
+    for (var j = 0; j < payload.images.length; j++) {
+      try {
+        var img = payload.images[j];
+        if (img.data && img.data.indexOf("http") === 0) {
+          uploadedUrls.push(img.data);
+          continue;
+        }
+        var base64Data = img.data;
+        if (!base64Data) continue;
+        if (base64Data.indexOf(",") > -1) {
+          base64Data = base64Data.split(",")[1];
+        }
+        base64Data = base64Data.replace(/-/g, "+").replace(/_/g, "/");
+        base64Data = base64Data.replace(/[^A-Za-z0-9\+\/=]/g, "");
+        var padNeeded = base64Data.length % 4;
+        if (padNeeded > 0) {
+          base64Data += "====".slice(padNeeded);
+        }
+        var decoded;
+        try {
+          decoded = Utilities.base64Decode(base64Data);
+        } catch (decErr) {
+          decoded = Utilities.base64DecodeWebSafe(base64Data);
+        }
+        var safeName = (img.name || "img_" + (j + 1) + ".jpg").replace(/[^a-zA-Z0-9\._\-]/g, "_");
+        var blob = Utilities.newBlob(decoded, img.type || "image/jpeg", safeName);
+        var file = listingFolder ? listingFolder.createFile(blob) : DriveApp.createFile(blob);
+        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        uploadedUrls.push("https://drive.google.com/thumbnail?id=" + file.getId() + "&sz=w1200");
+      } catch (imgErr) {
+        Logger.log("Failed to process image during update: " + imgErr.toString());
+      }
+    }
+    
+    if (uploadedUrls.length > 0) {
+      imageUrls = uploadedUrls;
+    }
+  }
+  
+  var rowData = [
+    searchId,
+    payload.title,
+    Number(payload.price),
+    payload.originalPrice ? Number(payload.originalPrice) : "",
+    payload.currency || "LKR",
+    payload.category,
+    payload.condition,
+    payload.location,
+    payload.description,
+    JSON.stringify(payload.tags || []),
+    Number(data[rowIndex - 1][10]), // preserve original timestamp
+    data[rowIndex - 1][11],         // preserve sellerId
+    data[rowIndex - 1][12],         // preserve sellerName
+    data[rowIndex - 1][13],         // preserve status
+    JSON.stringify(imageUrls),
+    payload.phone || ""
+  ];
+  
+  sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]);
+  
+  return {
+    id: searchId,
+    title: payload.title,
+    price: Number(payload.price),
+    originalPrice: payload.originalPrice ? Number(payload.originalPrice) : undefined,
+    currency: payload.currency || "LKR",
+    category: payload.category,
+    condition: payload.condition,
+    location: payload.location,
+    description: payload.description,
+    tags: payload.tags || [],
+    timestamp: Number(data[rowIndex - 1][10]),
+    sellerId: data[rowIndex - 1][11],
+    sellerName: data[rowIndex - 1][12],
+    status: data[rowIndex - 1][13],
+    images: imageUrls,
+    phone: payload.phone || ""
+  };
 }
 
 // Run this function once in the Google Apps Script editor to authorize all permissions!

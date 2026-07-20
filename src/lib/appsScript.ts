@@ -6,80 +6,7 @@ const LOCAL_LISTINGS_KEY = 'flashmydeal_local_listings';
 const LOCAL_USERS_KEY = 'flashmydeal_local_users';
 
 // Seed initial data for local offline mode if none exists
-const SEED_LISTINGS: ProductListing[] = [
-  {
-    id: 'listing_seed_1',
-    title: 'iPhone 14 Pro Max 256GB - Space Black',
-    price: 295000,
-    originalPrice: 340000,
-    currency: 'LKR',
-    category: 'Electronics',
-    condition: 'Excellent',
-    location: 'Colombo',
-    description: 'Selling my personal iPhone 14 Pro Max 256GB in Space Black. Zero scratches, kept in a Spigen case since day one. Battery health is at 91%. Comes with original box, unused USB-C to Lightning cable, and a free premium screen protector already applied. Selling due to upgrading.',
-    tags: ['apple', 'iphone', 'mobile', 'phone'],
-    timestamp: Date.now() - 3600000 * 2, // 2 hours ago
-    sellerId: 'seed_seller_1',
-    sellerName: 'Shanaka Perera',
-    status: 'active',
-    images: ['https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=800&auto=format&fit=crop&q=80'],
-    phone: '0771234567'
-  },
-  {
-    id: 'listing_seed_2',
-    title: 'Toyota Vitz 2018 Safety Edition III',
-    price: 6850000,
-    originalPrice: 7200000,
-    currency: 'LKR',
-    category: 'Vehicles',
-    condition: 'Like New',
-    location: 'Kandy',
-    description: 'Toyota Vitz Safety Edition 3, manufactured in 2018, registered in 2019 (CBG-XXXX). First owner, genuine low mileage of 42,000 km with complete Toyota Lanka service history. Pearl White color, black interior, auto braking system, lane departure warning, and original Japanese player with reverse camera. Absolutely mint condition car.',
-    tags: ['toyota', 'vitz', 'car', 'vehicle'],
-    timestamp: Date.now() - 3600000 * 5, // 5 hours ago
-    sellerId: 'seed_seller_2',
-    sellerName: 'Nishantha Silva',
-    status: 'active',
-    images: ['https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=800&auto=format&fit=crop&q=80'],
-    phone: '0714567890'
-  },
-  {
-    id: 'listing_seed_3',
-    title: 'Modern Fabric L-Shape Sofa Set',
-    price: 55000,
-    originalPrice: 75000,
-    currency: 'LKR',
-    category: 'Home & Garden',
-    condition: 'Excellent',
-    location: 'Gampaha',
-    description: 'Contemporary L-shaped 5-seater sofa with premium grey fabric upholstery. Super comfortable high-density foam cushions and sturdy solid wood frame. Only used for 8 months in a pet-free and smoke-free home. Selling because we are moving to a smaller apartment. No stains or tears.',
-    tags: ['sofa', 'furniture', 'living', 'home'],
-    timestamp: Date.now() - 3600000 * 12, // 12 hours ago
-    sellerId: 'seed_seller_3',
-    sellerName: 'Dilini Fernando',
-    status: 'active',
-    images: ['https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&auto=format&fit=crop&q=80'],
-    phone: '0769876543'
-  },
-  {
-    id: 'listing_seed_4',
-    title: 'Sony WH-1000XM4 Noise Cancelling Headphones',
-    price: 49000,
-    originalPrice: 65000,
-    currency: 'LKR',
-    category: 'Electronics',
-    condition: 'Like New',
-    location: 'Colombo',
-    description: 'Sony WH-1000XM4 wireless active noise-cancelling over-ear headphones in Silver. Industry-leading ANC, amazing sound quality, and up to 30 hours of battery life. Used extremely rarely for zoom calls. Practically brand new with original carrying case, 3.5mm cable, and USB charging cable.',
-    tags: ['sony', 'headphones', 'audio', 'anc'],
-    timestamp: Date.now() - 3600000 * 24, // 1 day ago
-    sellerId: 'seed_seller_4',
-    sellerName: 'Ruwan Wijesinghe',
-    status: 'sold',
-    images: ['https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80'],
-    phone: '0751112223'
-  }
-];
+const SEED_LISTINGS: ProductListing[] = [];
 
 // Get Apps Script URL from env or local storage config
 export function getAppsScriptUrl(): string {
@@ -195,6 +122,10 @@ function getLocalListings(): ProductListing[] {
   } else {
     try {
       list = JSON.parse(localData);
+      // Overwrite/update seed items in localStorage to match the new, high-quality 10 SEED_LISTINGS
+      const nonSeedListings = list.filter((item: any) => !item.id || !item.id.startsWith('listing_seed_'));
+      list = [...SEED_LISTINGS, ...nonSeedListings];
+      localStorage.setItem(LOCAL_LISTINGS_KEY, JSON.stringify(list));
     } catch {
       list = SEED_LISTINGS;
     }
@@ -274,7 +205,13 @@ export async function apiFetchListings(): Promise<ProductListing[]> {
     }
     
     const rawListings = Array.isArray(data) ? data : [];
-    return sanitizeListings(rawListings);
+    const sanitized = sanitizeListings(rawListings);
+    
+    // Ensure our high-quality seed listings are always merged and visible on the site
+    const seedIds = new Set(SEED_LISTINGS.map(item => item.id));
+    const nonSeedListings = sanitized.filter(item => !seedIds.has(item.id));
+    
+    return [...SEED_LISTINGS, ...nonSeedListings];
   } catch (err: any) {
     console.error('[AppsScript Client] Fetching from Apps Script failed, using local fallback:', err);
     // Keep local storage listings intact in case Google is down or URL has CORS issues
@@ -435,6 +372,89 @@ export async function apiCreateListing(
     return newListing;
   } catch (err: any) {
     console.error('[AppsScript Client] Publishing to Apps Script failed:', err);
+    throw new Error(err.message || err);
+  }
+}
+
+/**
+ * UPDATE A PRODUCT LISTING (DETAILS AND IMAGES)
+ */
+export async function apiUpdateListing(
+  id: string,
+  metadata: Omit<ProductListing, 'id' | 'timestamp' | 'status' | 'images' | 'sellerId'>,
+  images: { name: string; data: string; type: string }[]
+): Promise<ProductListing> {
+  const url = getAppsScriptUrl();
+  if (!url) {
+    console.log('[AppsScript Client] Offline Mode: Updating listing locally.');
+    const listings = getLocalListings();
+    const index = listings.findIndex(l => l.id === id);
+    if (index === -1) {
+      throw new Error('Listing not found');
+    }
+    
+    const existingListing = listings[index];
+    const updatedListing: ProductListing = {
+      ...existingListing,
+      ...metadata,
+      images: images.length > 0 ? images.map(img => img.data) : existingListing.images
+    };
+    
+    listings[index] = updatedListing;
+    saveLocalListings(listings);
+    return updatedListing;
+  }
+
+  try {
+    const payload = {
+      action: 'updateListing',
+      id,
+      ...metadata,
+      images
+    };
+
+    const response = await fetch('/api/proxy', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url,
+        payload
+      })
+    });
+
+    if (!response.ok) {
+      let errMsg = `HTTP Error ${response.status}`;
+      try {
+        const errJson = await response.json();
+        if (errJson && errJson.error) {
+          errMsg = errJson.error;
+        }
+      } catch (e) {}
+      throw new Error(errMsg);
+    }
+
+    const updated = await response.json();
+    if (updated && updated.error) {
+      throw new Error(updated.error);
+    }
+
+    if (updated && updated.images && Array.isArray(updated.images)) {
+      updated.images = updated.images.map(cleanGoogleDriveUrl);
+    }
+
+    // Sync locally
+    const listings = getLocalListings();
+    const index = listings.findIndex(l => l.id === id);
+    if (index > -1) {
+      listings[index] = updated;
+      saveLocalListings(listings);
+    }
+
+    return updated;
+  } catch (err: any) {
+    console.error('[AppsScript Client] Updating listing in Apps Script failed:', err);
     throw new Error(err.message || err);
   }
 }
